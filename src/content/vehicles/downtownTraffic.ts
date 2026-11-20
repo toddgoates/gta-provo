@@ -1,6 +1,7 @@
 import type { TrafficSpawn, TrafficModel } from "../../systems/TrafficSystem";
 import type { RoadLoop } from "../../systems/TrafficRoute";
 import { downtown } from "../downtown";
+import { drivers } from "../characters/drivers";
 
 export const downtownRoads = [
   { id: "center", axis: "x", end: downtown.bounds.width / 2 - 9, lane: 4.05, stop: 15.7 },
@@ -14,10 +15,10 @@ const models = {
 } as const satisfies Record<string, TrafficModel>;
 
 export const downtownTraffic: readonly TrafficSpawn[] = [
-  { id: "traffic-coral", road: downtownRoads[0], distance: 33, model: models.hatchback, color: 0xc85b50 },
-  { id: "traffic-cream", road: downtownRoads[0], distance: 12, model: models.sedan, color: 0xddc88d },
-  { id: "traffic-sage", road: downtownRoads[0], distance: 158, model: models.pickup, color: 0x6a8a77 },
-  { id: "traffic-blue", road: downtownRoads[1], distance: 18, model: models.sedan, color: 0x4e7eac },
-  { id: "traffic-yellow", road: downtownRoads[1], distance: 124, model: models.hatchback, color: 0xe5ac45 },
-  { id: "traffic-plum", road: downtownRoads[1], distance: 109, model: models.pickup, color: 0x8d627b },
+  { id: "traffic-coral", road: downtownRoads[0], distance: 33, model: models.hatchback, color: 0xc85b50, driver: drivers.sienna },
+  { id: "traffic-cream", road: downtownRoads[0], distance: 12, model: models.sedan, color: 0xddc88d, driver: drivers.cal },
+  { id: "traffic-sage", road: downtownRoads[0], distance: 158, model: models.pickup, color: 0x6a8a77, driver: drivers.ellis },
+  { id: "traffic-blue", road: downtownRoads[1], distance: 18, model: models.sedan, color: 0x4e7eac, driver: drivers.mira },
+  { id: "traffic-yellow", road: downtownRoads[1], distance: 124, model: models.hatchback, color: 0xe5ac45, driver: drivers.jade },
+  { id: "traffic-plum", road: downtownRoads[1], distance: 109, model: models.pickup, color: 0x8d627b, driver: drivers.leon },
 ];

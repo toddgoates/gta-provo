@@ -2,6 +2,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { beforeAll, expect, it } from "vitest";
 import { playerDefinition } from "../src/content/downtownStory";
 import { downtownTraffic } from "../src/content/vehicles/downtownTraffic";
+import { resolveWardrobe } from "../src/content/characters/wardrobe";
 import { FIXED_DT } from "../src/core/GameLoop";
 import { EntityManager } from "../src/entities/EntityManager";
 import { MovementSystem } from "../src/systems/MovementSystem";
@@ -10,6 +11,18 @@ import { driveMotion, VehicleSystem } from "../src/systems/VehicleSystem";
 
 const neutral = { throttle: 0, steer: 0, brake: false };
 beforeAll(async () => { await RAPIER.init(); });
+
+it("assigns distinct, valid outfits and appearances across the downtown drivers", () => {
+  const profiles = downtownTraffic.map(({ driver }) => driver);
+  const appearances = profiles.map(({ appearance }) => appearance);
+  const outfits = appearances.map(({ defaultWardrobe }) => resolveWardrobe(defaultWardrobe));
+  expect(new Set(profiles.map(({ gender }) => gender))).toEqual(new Set(["male", "female"]));
+  expect(new Set(appearances.map(({ haircut }) => haircut)).size).toBe(4);
+  for (const colors of [
+    appearances.map(({ skin }) => skin), appearances.map(({ hair }) => hair),
+    outfits.map(({ top }) => top.color), outfits.map(({ bottoms }) => bottoms.color),
+  ]) expect(new Set(colors).size).toBe(profiles.length);
+});
 
 it("accelerates, steers in opposite directions in forward and reverse, and brakes to zero", () => {
   const { model } = downtownTraffic[0];
@@ -41,6 +54,7 @@ it("boards only a nearby slow car, ejects its driver once, and parks beside a cl
     movement.board();
     expect(movement.collider.isEnabled()).toBe(false);
     expect(car.offRoute).toBeDefined();
+    expect(vehicles.drivers[0].profile).toBe(car.spawn.driver);
     expect(vehicles.drivers[0].running).toBe(false);
     for (let i = 0; i < 80; i++) step({ ...neutral, throttle: 1 });
     expect(traffic.pose(car, 1).x).toBeGreaterThan(start.x + 3);

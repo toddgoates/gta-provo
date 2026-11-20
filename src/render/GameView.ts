@@ -4,7 +4,6 @@ import { CameraRig } from "./CameraRig";
 import { TrafficView } from "./TrafficView";
 import type { TrafficSystem } from "../systems/TrafficSystem";
 import { buildCharacter } from "./CharacterView";
-import { driverAppearance } from "../content/characters/wardrobe";
 import type { FleeingDriver } from "../systems/VehicleSystem";
 
 export class GameView {
@@ -83,9 +82,10 @@ export class GameView {
     for (const driver of drivers) {
       let view = this.driverViews.get(driver.id);
       if (!view) {
-        const definition = { id: "driver", name: "Driver", kind: "npc" as const, modelId: "driver-proxy", appearance: driverAppearance };
+        const { appearance } = driver.profile;
+        const definition = { id: "driver", name: "Driver", kind: "npc" as const, modelId: "driver-proxy", appearance };
         view = buildCharacter({ id: driver.id, definition, position: driver.position, yaw: driver.yaw, enabled: true,
-          wardrobe: driverAppearance.defaultWardrobe });
+          wardrobe: appearance.defaultWardrobe });
         this.driverViews.set(driver.id, view);
         this.scene.add(view.group);
       }

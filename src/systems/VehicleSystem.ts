@@ -1,5 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { Point } from "../entities/EntityManager";
+import type { DriverProfile } from "../entities/Appearance";
 import type { TrafficCar, TrafficSystem } from "./TrafficSystem";
 
 export interface DriveInput { throttle: number; steer: number; brake: boolean }
@@ -25,6 +26,7 @@ export function driveMotion(speed: number, model: TrafficCar["spawn"]["model"], 
 interface CarBody { body: RAPIER.RigidBody; collider: RAPIER.Collider; sweep: RAPIER.Cuboid; center: number }
 export interface FleeingDriver {
   id: string;
+  profile: DriverProfile;
   position: Point;
   yaw: number;
   tumble: number;
@@ -85,7 +87,8 @@ export class VehicleSystem {
       const side = (player.x - x) * cos - (player.z - z) * sin >= 0 ? 1 : -1;
       const dx = cos * side, dz = -sin * side;
       const offset = car.spawn.model.width / 2 + .25;
-      this.fleeing.push({ id: `driver-${car.spawn.id}`, position: { x: x + dx * offset, y: .55, z: z + dz * offset },
+      this.fleeing.push({ id: `driver-${car.spawn.id}`, profile: car.spawn.driver,
+        position: { x: x + dx * offset, y: .55, z: z + dz * offset },
         yaw: Math.atan2(-dx, -dz), tumble: .35, running: false, age: 0, dx, dz });
       this.traffic.detach(car);
     }

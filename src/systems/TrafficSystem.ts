@@ -1,4 +1,5 @@
 import type { Point } from "../entities/EntityManager";
+import type { DriverProfile } from "../entities/Appearance";
 import type { RoadLoop, RoadPose } from "./TrafficRoute";
 import { forwardGap, loopLength, roadPose, stopDistances } from "./TrafficRoute";
 
@@ -18,6 +19,7 @@ export interface TrafficSpawn {
   distance: number;
   model: TrafficModel;
   color: number;
+  driver: DriverProfile;
 }
 
 export interface TrafficCar {

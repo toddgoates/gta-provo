@@ -9,6 +9,7 @@ export function buildCharacter(entity: Entity) {
   if (!appearance || !wardrobe) throw new Error(`Missing character appearance: ${entity.id}`);
 
   const group = new THREE.Group();
+  group.scale.x = appearance.build === "slim" ? .9 : appearance.build === "broad" ? 1.1 : 1;
   const cube = new THREE.BoxGeometry(1, 1, 1);
   const mat = (color: number) => new THREE.MeshLambertMaterial({ color });
   const skin = mat(appearance.skin);
@@ -39,9 +40,17 @@ export function buildCharacter(entity: Entity) {
     part(group, hair, -.052, 1.846, -.062, .231, .033, .232);
     part(group, hair, -.096, 1.746, -.172, .152, .039, .042);
     part(group, hair, 0, 1.736, .131, .35, .105, .064);
+  } else if (appearance.haircut === "cropped") {
+    part(group, hair, 0, 1.778, -.012, .351, .065, .322);
+    part(group, hair, 0, 1.731, .126, .336, .05, .041);
   } else {
     part(group, hair, 0, 1.8, -.015, .39, .12, .35);
     part(group, hair, 0, 1.63, .13, .35, .33, .12);
+    if (appearance.haircut === "long") {
+      part(group, hair, 0, 1.418, .18, .357, .52, .155);
+      part(group, hair, -.167, 1.565, .014, .079, .419, .209);
+      part(group, hair, .164, 1.59, .058, .086, .344, .16);
+    }
   }
 
   const limbs: THREE.Group[] = [];
