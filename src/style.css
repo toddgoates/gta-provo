@@ -24,6 +24,8 @@ body { margin: 0; }
 .health-label { display: flex; justify-content: space-between; margin-bottom: 5px; color: #ffe1d7; font: 700 .66rem ui-monospace, monospace; letter-spacing: .10em; text-transform: uppercase; }
 .health-track { height: 8px; background: #522832; }
 .health-fill { height: 100%; background: #ea4c50; transition: width 180ms ease-out; }
+.cash-balance { display: flex; justify-content: space-between; align-items: baseline; gap: 5px; margin-top: 9px; color: #bdf6b3; font: 700 .65rem ui-monospace, monospace; text-transform: uppercase; }
+.cash-balance output { color: #a7ef95; font-size: .82rem; }
 .wanted { display: flex; align-items: center; gap: 4px; margin-top: 7px; color: #ffe1d7; font: 700 .6rem ui-monospace, monospace; text-transform: uppercase; }
 .wanted span { margin-right: 3px; }
 .wanted i { width: 8px; height: 8px; border: 1px solid #bc676e; border-radius: 50%; background: #452832; }
@@ -77,7 +79,7 @@ kbd { display: inline-block; background: #494552; border: 1px solid var(--line);
   .controls { bottom: 16px; right: 16px; max-width: calc(100% - 162px); }
 }
 @media (max-width: 480px) {
-  .mission { top: 127px; }
+  .mission { top: 158px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .health-fill { transition: none; }

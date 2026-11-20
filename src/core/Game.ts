@@ -12,6 +12,7 @@ import { GameView } from "../render/GameView";
 import { DialogueSystem } from "../systems/DialogueSystem";
 import { InteractionSystem } from "../systems/InteractionSystem";
 import { HealthSystem } from "../systems/HealthSystem";
+import { CashSystem } from "../systems/CashSystem";
 import { MeleeSystem } from "../systems/MeleeSystem";
 import { CrimeSystem } from "../systems/CrimeSystem";
 import { WantedLevelSystem } from "../systems/WantedLevelSystem";
@@ -64,7 +65,8 @@ export class Game {
   private loop: GameLoop;
   private candidate: Entity | null = null;
   private carCandidate: TrafficCar | null = null;
-  private money = 0;
+  private cash = new CashSystem(this.events, this.player.id);
+  private missionReward = 0;
   private complete = false;
   private debug = false;
   private fps = 60;
@@ -147,7 +149,7 @@ export class Game {
     this.events.on("dialogue:completed", () => this.sequences.end());
     this.events.on("world:flag-set", ({ flag, value }) => this.flags.set(flag, value));
     this.events.on("mission:completed", ({ money }) => {
-      this.money += money;
+      this.missionReward = money;
       this.complete = true;
       this.publishHud();
     });
@@ -188,6 +190,7 @@ export class Game {
     this.input.dispose();
     this.mission.dispose();
     this.crime.dispose();
+    this.cash.dispose();
     this.events.clear();
     this.movement.dispose();
     this.vehicles.dispose();
@@ -229,6 +232,7 @@ export class Game {
     this.physics.step();
     const occupied = this.vehicles.occupied;
     if (occupied) {
+      this.cash.step(dt);
       const { x, z, yaw } = this.traffic.pose(occupied, 1);
       this.player.position = { x, y: 0, z };
       this.player.yaw = yaw;
@@ -262,6 +266,7 @@ export class Game {
       this.publishHud();
       if (this.health.depleted) return;
     }
+    if (this.cash.step(dt, this.player.position)) this.publishHud();
     this.triggers.update(this.player.position);
     this.candidate = this.interaction.nearest(this.player.position, this.entities.all());
     this.carCandidate = this.vehicles.nearest(this.player.position, this.movement.collider)?.car ?? null;
@@ -306,6 +311,7 @@ export class Game {
     this.view.updateTraffic(this.traffic, alpha);
     this.view.updatePedestrians(this.pedestrians.walkers, alpha, this.melee);
     this.view.updateDrivers(this.vehicles.drivers);
+    this.view.updateCash(this.cash.pickups);
     this.view.render(this.player, interpolated, walk ? this.movement.speed : 0, this.goal,
       camera === "hold" ? 0 : dt, !!occupied, this.melee.getPose(this.player.id));
     if (import.meta.env.DEV && dt > 0) this.fps += (1 / dt - this.fps) * .09;
@@ -342,7 +348,8 @@ export class Game {
       goal: this.goal ?? null,
       player: this.player.position,
       yaw: this.player.yaw,
-      money: this.money,
+      money: this.cash.money,
+      missionReward: this.missionReward,
       complete: this.complete,
       locked: document.pointerLockElement === this.view.renderer.domElement,
       debug: import.meta.env.DEV && this.debug ? { fps: Math.round(this.fps), responders: this.police.count,

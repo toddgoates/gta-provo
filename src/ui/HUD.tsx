@@ -72,6 +72,7 @@ export function HUD({ pause, advance, restart, setWanted }: {
           <div className="health-track" role="progressbar" aria-label="Health" aria-valuenow={hud.health} aria-valuemin={0} aria-valuemax={100}>
             <div className="health-fill" style={{ width: `${hud.health}%` }} />
           </div>
+          <div className="cash-balance"><span>Cash</span><output aria-label="Cash balance">${hud.money.toLocaleString("en-US")}</output></div>
           <div className="wanted" role="meter" aria-label="Wanted level" aria-valuenow={hud.wanted} aria-valuemin={0} aria-valuemax={5}>
             <span aria-hidden="true">Wanted</span>
             {[1, 2, 3, 4, 5].map((dot) => <i key={dot} className={hud.wanted >= dot ? "lit" : ""} aria-hidden="true" />)}
@@ -89,7 +90,7 @@ export function HUD({ pause, advance, restart, setWanted }: {
           {hud.complete && <section className="mission panel complete" role="status">
             <div className="eyebrow">✓ &nbsp; Mission complete</div>
             <h1>Chair confirmed.</h1>
-            <p>+${hud.money} · Downtown is yours to explore.</p>
+            <p>+${hud.missionReward} · Downtown is yours to explore.</p>
           </section>}
           <DistrictMap {...hud} />
           {hud.prompt && <div className="interaction panel"><kbd>E</kbd> {hud.prompt}</div>}

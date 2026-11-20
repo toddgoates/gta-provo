@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import type { Entity, Point } from "../entities/EntityManager";
 import { CameraRig } from "./CameraRig";
+import { CashView } from "./CashView";
+import type { CashDrop } from "../systems/CashSystem";
 import { TrafficView } from "./TrafficView";
 import type { TrafficSystem } from "../systems/TrafficSystem";
 import { buildCharacter } from "./CharacterView";
@@ -17,6 +19,7 @@ export class GameView {
   private trafficViews: TrafficView[] = [];
   private driverViews = new Map<string, ReturnType<typeof buildCharacter>>();
   private downedMarks = new Map<string, THREE.Mesh>();
+  private cash = new CashView();
   private marker = new THREE.Group();
   private crystal: THREE.Mesh;
   private shadow = new THREE.Mesh(new THREE.CircleGeometry(.49, 12),
@@ -44,7 +47,7 @@ export class GameView {
     this.marker.add(ring, this.crystal);
     this.marker.visible = false;
     this.shadow.rotation.x = -Math.PI / 2;
-    this.scene.add(this.marker, this.shadow);
+    this.scene.add(this.marker, this.shadow, this.cash.root);
     mount.append(this.renderer.domElement);
     const resize = () => {
       const { clientWidth: width, clientHeight: height } = mount;
@@ -102,6 +105,8 @@ export class GameView {
       this.trafficViews[index].update(traffic.pose(car, alpha), car.travelled, car.braking);
     });
   }
+
+  updateCash(drops: Iterable<CashDrop>): void { this.cash.update(drops, this.time); }
 
   updateDrivers(drivers: readonly FleeingDriver[]): void {
     for (const view of this.driverViews.values()) view.group.visible = false;
@@ -185,6 +190,7 @@ export class GameView {
 
   dispose(): void {
     this.resizeObserver.disconnect();
+    this.cash.dispose();
     this.disposeMeshes(this.scene);
     this.scene.clear();
     this.renderer.dispose();

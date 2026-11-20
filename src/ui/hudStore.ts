@@ -16,6 +16,7 @@ export interface HudSnapshot {
   player: Point;
   yaw: number;
   money: number;
+  missionReward: number;
   complete: boolean;
   locked: boolean;
   debug: { fps: number; responders: number; seenByPolice: boolean; wantedDecay: number } | null;
