@@ -13,6 +13,8 @@ import { MovementSystem } from "../systems/MovementSystem";
 import { SequenceDirector } from "../systems/SequenceDirector";
 import { TriggerSystem } from "../systems/TriggerSystem";
 import { TrafficSystem } from "../systems/TrafficSystem";
+import type { TrafficCar } from "../systems/TrafficSystem";
+import { VehicleSystem } from "../systems/VehicleSystem";
 import { equipGarment } from "../systems/WardrobeSystem";
 import type { HudSnapshot } from "../ui/hudStore";
 import { WorldManager } from "../world/WorldManager";
@@ -34,7 +36,7 @@ export class Game {
   private interaction = new InteractionSystem(this.events);
   private sequences = new SequenceDirector(this.director);
   private traffic = new TrafficSystem(downtownTraffic);
-  private trafficBodies: RAPIER.RigidBody[];
+  private vehicles: VehicleSystem;
   private player = this.entities.spawn("player", playerDefinition, downtown.spawns.player, .23);
   private npc = this.entities.spawn("marla-downtown", marlaDefinition, downtown.spawns.npc, Math.PI + .42);
   private view: GameView;
@@ -44,6 +46,7 @@ export class Game {
   private input: InputManager;
   private loop: GameLoop;
   private candidate: Entity | null = null;
+  private carCandidate: TrafficCar | null = null;
   private money = 0;
   private complete = false;
   private debug = false;
@@ -66,15 +69,7 @@ export class Game {
     this.view.addActor(this.player);
     this.view.addActor(this.npc);
     this.view.addTraffic(this.traffic);
-    this.trafficBodies = this.traffic.cars.map((car) => {
-      const { x, z, yaw } = this.traffic.pose(car, 1);
-      const { width, height, length } = car.spawn.model;
-      const body = this.physics.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased()
-        .setTranslation(x, 0, z).setRotation(this.yawRotation(yaw)));
-      this.physics.createCollider(RAPIER.ColliderDesc.cuboid(width / 2, height / 2, length / 2)
-        .setTranslation(0, height / 2, 0), body);
-      return body;
-    });
+    this.vehicles = new VehicleSystem(this.physics, this.traffic);
 
     this.input = new InputManager(this.view.renderer.domElement,
       () => this.director.policy.walk || this.director.policy.drive,
@@ -135,7 +130,7 @@ export class Game {
     this.mission.dispose();
     this.events.clear();
     this.movement.dispose();
-    for (const body of this.trafficBodies) this.physics.removeRigidBody(body);
+    this.vehicles.dispose();
     this.district.dispose();
     this.physics.free();
     this.view.dispose();
@@ -154,18 +149,47 @@ export class Game {
         heading: this.view.rig.heading,
       });
     }
-    this.traffic.step(dt, this.player.position);
-    this.traffic.cars.forEach((car, index) => {
-      const { x, z, yaw } = this.traffic.pose(car, 1);
-      const body = this.trafficBodies[index];
-      body.setNextKinematicTranslation({ x, y: 0, z });
-      body.setNextKinematicRotation(this.yawRotation(yaw));
-    });
+    const use = this.input.take("KeyE");
+    if (policy.drive && use) this.vehicles.exitRequested = true;
+    this.vehicles.step(dt, {
+      throttle: Number(this.input.down("KeyW")) - Number(this.input.down("KeyS")),
+      steer: Number(this.input.down("KeyA")) - Number(this.input.down("KeyD")),
+      brake: this.input.down("Space"),
+    }, policy.walk ? this.player.position : undefined);
     this.physics.step();
-    if (policy.walk) this.movement.commit(dt);
+    const occupied = this.vehicles.occupied;
+    if (occupied) {
+      const { x, z, yaw } = this.traffic.pose(occupied, 1);
+      this.player.position = { x, y: 0, z };
+      this.player.yaw = yaw;
+      if (this.vehicles.exitRequested) {
+        const exit = this.vehicles.exit();
+        if (exit) {
+          this.movement.disembark(exit.point, exit.yaw);
+          this.view.rig.heading = exit.yaw;
+          this.director.setFreeMode("exploration");
+          this.input.clear();
+          this.events.emit("vehicle:exited", { vehicleId: exit.car.spawn.id });
+          this.publishHud();
+        }
+      }
+      return;
+    }
+    if (!policy.walk) return;
+    this.movement.commit(dt);
     this.triggers.update(this.player.position);
-    this.candidate = policy.interact ? this.interaction.nearest(this.player.position, this.entities.all()) : null;
-    if (this.input.take("KeyE") && this.candidate) this.interaction.use(this.candidate);
+    this.candidate = this.interaction.nearest(this.player.position, this.entities.all());
+    this.carCandidate = this.vehicles.nearest(this.player.position, this.movement.collider)?.car ?? null;
+    if (!use) return;
+    if (this.candidate) this.interaction.use(this.candidate);
+    else if (this.carCandidate && this.director.setFreeMode("driving")) {
+      this.vehicles.enter(this.carCandidate, this.player.position);
+      this.movement.board();
+      this.carCandidate = null;
+      this.input.clear();
+      this.events.emit("vehicle:entered", { vehicleId: this.vehicles.occupied!.spawn.id });
+      this.publishHud();
+    }
   };
 
   private render = (dt: number, alpha: number): void => {
@@ -177,25 +201,26 @@ export class Game {
       z: last.z + (position.z - last.z) * alpha,
     };
     const { camera, walk } = this.director.policy;
+    const occupied = this.vehicles.occupied;
+    const vehiclePose = occupied ? this.traffic.pose(occupied, alpha) : undefined;
     if (camera !== "hold") {
       const focusId = camera === "focus" ? this.sequences.focusId : undefined;
       const focus = focusId ? this.entities.get(focusId)?.position : undefined;
-      this.view.rig.update(dt, interpolated, focus, this.castCameraRay);
+      this.view.rig.update(dt, vehiclePose ? { ...vehiclePose, y: 0 } : interpolated, focus, this.castCameraRay, vehiclePose?.yaw);
     }
     this.view.updateTraffic(this.traffic, alpha);
-    this.view.render(this.player, interpolated, walk ? this.movement.speed : 0, this.goal, camera === "hold" ? 0 : dt);
+    this.view.updateDrivers(this.vehicles.drivers);
+    this.view.render(this.player, interpolated, walk ? this.movement.speed : 0, this.goal, camera === "hold" ? 0 : dt, !!occupied);
     if (import.meta.env.DEV && dt > 0) this.fps += (1 / dt - this.fps) * .09;
     this.hudElapsed += dt;
     if (this.hudElapsed >= .1) this.publishHud();
   };
 
-  private yawRotation(yaw: number): RAPIER.Rotation {
-    return { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) };
-  }
-
   private castCameraRay = (origin: Point, direction: Point, distance: number): number | undefined => {
+    const car = this.vehicles.occupiedCollider;
     const hit = this.physics.castRay(new RAPIER.Ray(origin, direction), distance, true,
-      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, this.movement.collider);
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, this.movement.collider,
+      undefined, (collider) => collider.handle !== car?.handle);
     return hit?.timeOfImpact;
   };
 
@@ -211,7 +236,10 @@ export class Game {
       mode: this.director.mode,
       mission: current && { title: current.mission.title, objective: current.objective.text },
       dialogue: this.dialogue.view,
-      prompt: this.director.policy.interact ? this.candidate?.definition.interaction?.prompt ?? null : null,
+      prompt: this.director.policy.interact ? this.candidate?.definition.interaction?.prompt ??
+        (this.carCandidate ? this.carCandidate.offRoute ? "Get in car" : "Take car" : null) : null,
+      driving: this.vehicles.occupied ? { speed: Math.round(Math.abs(this.vehicles.occupied.speed) * 2.237),
+        exiting: this.vehicles.exitRequested, blocked: this.vehicles.exitBlocked } : null,
       goal: this.goal ?? null,
       player: this.player.position,
       yaw: this.player.yaw,

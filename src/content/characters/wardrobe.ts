@@ -4,6 +4,7 @@ export const garments = {
   top: {
     "gray-tee": { color: 0xc9ccd1, sleeves: "short", trim: null },
     "marla-cardigan": { color: 0x61857d, sleeves: "long", trim: 0xe5bd8d },
+    "driver-jacket": { color: 0x967352, sleeves: "long", trim: 0xd9b787 },
   },
   bottoms: {
     "blue-jeans": { color: 0x426792, seam: 0x375478 },
@@ -26,6 +27,11 @@ export const localAppearance: CharacterAppearance = {
 export const marlaAppearance: CharacterAppearance = {
   skin: 0xd69b78, hair: 0x653e46, eyes: 0x3a2f38, haircut: "bob",
   defaultWardrobe: { top: "marla-cardigan", bottoms: "marla-trousers", shoes: "dark-sneakers" },
+};
+
+export const driverAppearance: CharacterAppearance = {
+  skin: 0xbf896b, hair: 0x47404b, eyes: 0x4c4c3c, haircut: "short",
+  defaultWardrobe: { top: "driver-jacket", bottoms: "marla-trousers", shoes: "dark-sneakers" },
 };
 
 export function resolveWardrobe({ top, bottoms, shoes }: Wardrobe) {

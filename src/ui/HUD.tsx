@@ -63,9 +63,18 @@ export function HUD({ pause, advance }: { pause: () => void; advance: (choiceId?
           </section>}
           <DistrictMap {...hud} />
           {hud.prompt && <div className="interaction panel"><kbd>E</kbd> {hud.prompt}</div>}
+          {hud.driving && <div className="interaction panel" role="status">
+            {hud.driving.exiting ? "Stopping to get out…" : hud.driving.blocked ? "Exit blocked. Move the car to a clear spot." :
+              <><kbd>E</kbd> Exit car <span className="driving-speed">{hud.driving.speed} mph</span></>}
+          </div>}
           <div className="controls panel">
-            <span><kbd>WASD</kbd> Walk</span><span><kbd>SHIFT</kbd> Sprint</span>
-            <span><kbd>SPACE</kbd> Jump</span><span>{hud.locked ? "Mouse to look" : "Click to capture · Drag to look"}</span>
+            {hud.driving ? <>
+              <span><kbd>W</kbd> Accelerate</span><span><kbd>A / D</kbd> Steer</span>
+              <span><kbd>S</kbd> Brake / Reverse</span><span><kbd>SPACE</kbd> Brake</span>
+            </> : <>
+              <span><kbd>WASD</kbd> Walk</span><span><kbd>SHIFT</kbd> Sprint</span>
+              <span><kbd>SPACE</kbd> Jump</span><span>{hud.locked ? "Mouse to look" : "Click to capture · Drag to look"}</span>
+            </>}
           </div>
         </>
       )}

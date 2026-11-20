@@ -8,6 +8,7 @@ export interface HudSnapshot {
   mission: { title: string; objective: string } | null;
   dialogue: DialogueSystem["view"];
   prompt: string | null;
+  driving: { speed: number; exiting: boolean; blocked: boolean } | null;
   goal: Point | null;
   player: Point;
   yaw: number;

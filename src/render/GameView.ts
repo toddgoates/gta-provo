@@ -4,6 +4,8 @@ import { CameraRig } from "./CameraRig";
 import { TrafficView } from "./TrafficView";
 import type { TrafficSystem } from "../systems/TrafficSystem";
 import { buildCharacter } from "./CharacterView";
+import { driverAppearance } from "../content/characters/wardrobe";
+import type { FleeingDriver } from "../systems/VehicleSystem";
 
 export class GameView {
   readonly renderer: THREE.WebGLRenderer;
@@ -11,6 +13,7 @@ export class GameView {
   readonly rig = new CameraRig();
   private actors = new Map<string, { entity: Entity; view: ReturnType<typeof buildCharacter> }>();
   private trafficViews: TrafficView[] = [];
+  private driverViews = new Map<string, ReturnType<typeof buildCharacter>>();
   private marker = new THREE.Group();
   private crystal: THREE.Mesh;
   private shadow = new THREE.Mesh(new THREE.CircleGeometry(.49, 12),
@@ -75,18 +78,39 @@ export class GameView {
     });
   }
 
-  render(player: Entity, position: Point, speed: number, goal: Point | undefined, dt: number): void {
+  updateDrivers(drivers: readonly FleeingDriver[]): void {
+    for (const view of this.driverViews.values()) view.group.visible = false;
+    for (const driver of drivers) {
+      let view = this.driverViews.get(driver.id);
+      if (!view) {
+        const definition = { id: "driver", name: "Driver", kind: "npc" as const, modelId: "driver-proxy", appearance: driverAppearance };
+        view = buildCharacter({ id: driver.id, definition, position: driver.position, yaw: driver.yaw, enabled: true,
+          wardrobe: driverAppearance.defaultWardrobe });
+        this.driverViews.set(driver.id, view);
+        this.scene.add(view.group);
+      }
+      view.group.visible = true;
+      view.group.position.set(driver.position.x, driver.position.y, driver.position.z);
+      view.group.rotation.set(-driver.tumble, driver.yaw, 0, "YXZ");
+      const stride = driver.running ? Math.sin(this.time * 15) * .78 : .45;
+      this.animateStride(view, stride);
+    }
+  }
+
+  render(player: Entity, position: Point, speed: number, goal: Point | undefined, dt: number, seated = false): void {
     this.time += dt;
     for (const { entity, view } of this.actors.values()) {
       if (entity.wardrobe) view.updateWardrobe(entity.wardrobe);
     }
     const actor = this.actors.get(player.id)!.view;
+    actor.group.visible = !seated;
     actor.group.position.set(position.x, position.y, position.z);
     actor.group.rotation.y = player.yaw;
     const stride = Math.sin(this.time * (speed > 6 ? 14 : 10)) * Math.min(.65, speed * .085);
-    actor.limbs.forEach((limb, index) => { limb.rotation.x = (index === 0 || index === 3) ? stride : -stride; });
+    this.animateStride(actor, stride);
     const onBlock = Math.abs(position.x) > 9.2 && Math.abs(position.z) > 9.2;
     this.shadow.position.set(position.x, onBlock ? .163 : .004, position.z);
+    this.shadow.visible = !seated;
     this.marker.visible = !!goal;
     if (goal) {
       this.marker.position.set(goal.x, goal.y, goal.z);
@@ -94,6 +118,10 @@ export class GameView {
       this.crystal.rotation.y = this.time * 1.8;
     }
     this.renderer.render(this.scene, this.rig.camera);
+  }
+
+  private animateStride(actor: ReturnType<typeof buildCharacter>, stride: number): void {
+    actor.limbs.forEach((limb, index) => { limb.rotation.x = (index === 0 || index === 3) ? stride : -stride; });
   }
 
   dispose(): void {

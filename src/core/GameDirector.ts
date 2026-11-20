@@ -6,7 +6,7 @@ type SceneMode = "dialogue" | "cutscene";
 const policies = {
   exploration: { physics: true, walk: true, drive: false, interact: true, camera: "follow" },
   interior: { physics: true, walk: true, drive: false, interact: true, camera: "follow" },
-  driving: { physics: true, walk: false, drive: true, interact: true, camera: "vehicle" },
+  driving: { physics: true, walk: false, drive: true, interact: false, camera: "vehicle" },
   dialogue: { physics: false, walk: false, drive: false, interact: false, camera: "focus" },
   cutscene: { physics: false, walk: false, drive: false, interact: false, camera: "focus" },
   paused: { physics: false, walk: false, drive: false, interact: false, camera: "hold" },

@@ -50,6 +50,24 @@ export class MovementSystem {
     this.speed = Math.hypot(x - this.previous.x, z - this.previous.z) / dt;
   }
 
+  board(): void {
+    this.collider.setEnabled(false);
+    this.speed = 0;
+  }
+
+  disembark(position: Point, yaw: number): void {
+    const center = { ...position, y: position.y + CENTER };
+    this.body.setTranslation(center, true);
+    this.body.setNextKinematicTranslation(center);
+    this.collider.setEnabled(true);
+    this.world.propagateModifiedBodyPositionsToColliders();
+    this.player.position = position;
+    this.player.yaw = yaw;
+    this.previous = position;
+    this.vertical = 0;
+    this.grounded = false;
+  }
+
   dispose(): void {
     this.world.removeCharacterController(this.controller);
     this.world.removeRigidBody(this.body);

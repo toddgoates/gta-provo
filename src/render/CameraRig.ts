@@ -18,9 +18,12 @@ export class CameraRig {
     this.pitch = THREE.MathUtils.clamp(this.pitch + dy * .0028, -.12, 1.06);
   }
 
-  update(dt: number, player: Point, focus: Point | undefined, obstruction: Obstruction): void {
+  update(dt: number, player: Point, focus: Point | undefined, obstruction: Obstruction, vehicleYaw?: number): void {
     this.target.set(player.x, player.y + 1.48, player.z);
-    if (focus) {
+    if (vehicleYaw !== undefined) {
+      this.target.y = player.y + 1.05;
+      this.offset.set(7.7 * Math.sin(vehicleYaw), 3.2, 7.7 * Math.cos(vehicleYaw));
+    } else if (focus) {
       this.target.lerp(new THREE.Vector3(focus.x, focus.y + 1.48, focus.z), .68);
       const towardPlayer = Math.atan2(player.x - focus.x, player.z - focus.z) + .55;
       this.offset.set(Math.sin(towardPlayer) * 3.3, 1.02, Math.cos(towardPlayer) * 3.3);

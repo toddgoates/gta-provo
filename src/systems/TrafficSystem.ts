@@ -1,5 +1,5 @@
 import type { Point } from "../entities/EntityManager";
-import type { RoadLoop } from "./TrafficRoute";
+import type { RoadLoop, RoadPose } from "./TrafficRoute";
 import { forwardGap, loopLength, roadPose, stopDistances } from "./TrafficRoute";
 
 export interface TrafficModel {
@@ -20,7 +20,7 @@ export interface TrafficSpawn {
   color: number;
 }
 
-interface TrafficCar {
+export interface TrafficCar {
   readonly spawn: TrafficSpawn;
   distance: number;
   previous: number;
@@ -29,6 +29,7 @@ interface TrafficCar {
   braking: boolean;
   waiting: number;
   arrived: number;
+  offRoute?: { pose: RoadPose; previous: RoadPose };
 }
 
 const BRAKE = 4.2;
@@ -50,10 +51,17 @@ export class TrafficSystem {
     }));
   }
 
-  step(dt: number, pedestrian: Point): void {
+  detach(car: TrafficCar): void {
+    if (car.offRoute) return;
+    const pose = this.pose(car, 1);
+    car.offRoute = { pose, previous: pose };
+    if (this.crossing === car) this.crossing = undefined;
+  }
+
+  step(dt: number, pedestrian?: Point): void {
     this.time += dt;
     if (!this.crossing) {
-      const next = this.cars.filter((car) => car.waiting >= STOP_TIME)
+      const next = this.cars.filter((car) => !car.offRoute && car.waiting >= STOP_TIME)
         .sort((a, b) => a.arrived - b.arrived)[0];
       if (next) {
         this.crossing = next;
@@ -63,9 +71,11 @@ export class TrafficSystem {
       }
     }
     // Compute every driver's decision from the same starting poses.
-    const plans = this.cars.map((car) => this.plan(car, pedestrian, dt));
+    const plans = this.cars.map((car) => car.offRoute ? null : this.plan(car, pedestrian, dt));
     this.cars.forEach((car, index) => {
-      const { speed, move, stoppedAtLine } = plans[index];
+      const plan = plans[index];
+      if (!plan) return;
+      const { speed, move, stoppedAtLine } = plan;
       car.previous = car.distance;
       car.braking = speed + .025 < car.speed || speed < .04 && (stoppedAtLine || move === 0);
       car.speed = speed;
@@ -83,11 +93,16 @@ export class TrafficSystem {
   }
 
   pose(car: TrafficCar, alpha: number) {
+    if (car.offRoute) {
+      const { pose, previous } = car.offRoute;
+      return { x: previous.x + (pose.x - previous.x) * alpha, z: previous.z + (pose.z - previous.z) * alpha,
+        yaw: previous.yaw + (pose.yaw - previous.yaw) * alpha, turning: pose.turning };
+    }
     const length = loopLength(car.spawn.road);
     return roadPose(car.spawn.road, car.previous + forwardGap(car.previous, car.distance, length) * alpha);
   }
 
-  private plan(car: TrafficCar, pedestrian: Point, dt: number) {
+  private plan(car: TrafficCar, pedestrian: Point | undefined, dt: number) {
     const { road, model } = car.spawn;
     const length = loopLength(road);
     let hardDistance = Infinity;
@@ -109,19 +124,29 @@ export class TrafficSystem {
     }
 
     for (const other of this.cars) {
-      if (other === car || other.spawn.road.id !== road.id) continue;
+      if (other === car || other.offRoute || other.spawn.road.id !== road.id) continue;
       const gap = forwardGap(car.distance, other.distance, length) - (model.length + other.spawn.model.length) / 2;
       const clear = Math.max(0, gap - FOLLOW_GAP);
       hardDistance = Math.min(hardDistance, clear);
       target = Math.min(target, other.speed + clear / 1.35, Math.sqrt(other.speed ** 2 + 2 * BRAKE * clear));
     }
 
-    if (pedestrian.y < model.height + .1) {
-      // Sample the lane ahead, including curves; don't brake for someone on the sidewalk.
-      const lookAhead = Math.max(8, car.speed ** 2 / (2 * BRAKE) + model.length / 2 + 2.5);
+    // Sample the lane ahead for the player or any car no longer controlled by traffic.
+    const lookAhead = Math.max(8, car.speed ** 2 / (2 * BRAKE) + model.length / 2 + 2.5);
+    const obstacles = this.cars.filter((other) => other.offRoute).map((other) => {
+      const pose = other.offRoute!.pose;
+      return { ...pose, halfW: other.spawn.model.width / 2, halfL: other.spawn.model.length / 2 };
+    });
+    if (pedestrian && pedestrian.y < model.height + .1 || obstacles.length) {
+      const width = model.width / 2;
       for (let step = 0; step <= lookAhead; step += .45) {
         const p = roadPose(road, car.distance + step);
-        if (Math.hypot(pedestrian.x - p.x, pedestrian.z - p.z) < model.width / 2 + .55) {
+        if ((pedestrian && pedestrian.y < model.height + .1 &&
+          Math.hypot(pedestrian.x - p.x, pedestrian.z - p.z) < width + .55) || obstacles.some((o) => {
+          const x = p.x - o.x, z = p.z - o.z;
+          return Math.abs(x * Math.cos(o.yaw) - z * Math.sin(o.yaw)) < o.halfW + width + .15
+            && Math.abs(x * Math.sin(o.yaw) + z * Math.cos(o.yaw)) < o.halfL + width;
+        })) {
           limitForStop(Math.max(0, step - model.length / 2 - .75));
           break;
         }

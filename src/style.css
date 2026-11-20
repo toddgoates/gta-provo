@@ -40,6 +40,7 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 kbd { display: inline-block; background: #494552; border: 1px solid var(--line); border-radius: 3px; padding: 2px 4px; letter-spacing: .04em; color: var(--paper); }
 .interaction { position: absolute; left: 50%; bottom: 21%; transform: translateX(-50%); padding: 8px 13px; font-size: .87rem; font-weight: 700; white-space: nowrap; }
 .interaction kbd { background: var(--gold); color: #29252b; margin-right: 5px; }
+.driving-speed { margin-left: 12px; color: var(--gold); white-space: nowrap; }
 .dialogue, .pause { padding: 22px; border-top: 3px solid var(--gold); pointer-events: auto; }
 .dialogue { position: absolute; left: 50%; bottom: 7%; transform: translateX(-50%); width: min(570px, calc(100% - 32px)); }
 .dialogue h2, .pause h2 { margin: 6px 0; letter-spacing: -.035em; }
