@@ -6,10 +6,20 @@ import { CrimeSystem } from "../src/systems/CrimeSystem";
 import { WantedLevelSystem } from "../src/systems/WantedLevelSystem";
 import { PoliceResponseSystem } from "../src/systems/PoliceResponseSystem";
 import { policeConfig } from "../src/content/police";
+import { reinforcementLooks } from "../src/content/police";
+import { downtownPedestrians } from "../src/content/pedestrians";
 
 const origin = { x: 0, y: 0, z: 0 };
 const npc = { id: "npc", kind: "npc", modelId: "proxy", name: "NPC" } as const;
 const police = { ...npc, id: "police", faction: "police" } as const;
+
+it("includes different officer silhouettes in both the foot patrols and reinforcements", () => {
+  const patrols = downtownPedestrians.filter(({ faction }) => faction === "police");
+  expect(patrols.some(({ appearance }) => appearance?.silhouette === "tapered")).toBe(true);
+  expect(patrols.some(({ appearance }) => appearance && !appearance.silhouette)).toBe(true);
+  expect(reinforcementLooks.some(({ silhouette }) => silhouette === "tapered")).toBe(true);
+  expect(reinforcementLooks.some(({ silhouette }) => !silhouette)).toBe(true);
+});
 
 it("only counts player crimes witnessed by a conscious nearby officer with a clear view", () => {
   const events = new EventBus();

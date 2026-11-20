@@ -37,6 +37,7 @@ export const localAppearance: CharacterAppearance = {
 
 export const marlaAppearance: CharacterAppearance = {
   skin: 0xd69b78, hair: 0x653e46, eyes: 0x3a2f38, haircut: "bob",
+  silhouette: "tapered",
   defaultWardrobe: { top: "marla-cardigan", bottoms: "marla-trousers", shoes: "dark-sneakers" },
 };
 

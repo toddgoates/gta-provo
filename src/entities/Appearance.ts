@@ -8,8 +8,9 @@ export interface CharacterAppearance {
   readonly skin: number;
   readonly hair: number;
   readonly eyes: number;
-  readonly haircut: "cropped" | "short" | "bob" | "long";
+  readonly haircut: "cropped" | "short" | "bob" | "long" | "ponytail";
   readonly build?: "slim" | "standard" | "broad";
+  readonly silhouette?: "tapered";
   readonly defaultWardrobe: Wardrobe;
 }
 

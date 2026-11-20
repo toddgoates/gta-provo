@@ -20,7 +20,7 @@ Open the URL printed by Vite (normally `http://localhost:5173`). Walk toward **M
 | Space | Jump |
 | Click the scene / left-drag | Capture the mouse for camera control / look without pointer lock |
 | E | Use the nearby interaction |
-| F | Right punch; two taps chain right–left, three add a kick |
+| Left click | Right punch; two clicks chain right–left, three add a kick. The first click captures the mouse without attacking. |
 | Esc | Pause or resume; releasing pointer lock also pauses |
 | F1 | Toggle the debug panel (development only) |
 

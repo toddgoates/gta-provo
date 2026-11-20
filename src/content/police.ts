@@ -35,7 +35,15 @@ export const reinforcementPoints: readonly Point[] = [
   [46, 11.5], [29, 11.5], [10.5, 35], [10.5, 47], [-53, 17], [56, 22],
 ].map(([x, z]) => ({ x, y: .15, z }));
 
-export const policeAppearance: CharacterAppearance = {
-  skin: 0xc68c67, hair: 0x413027, eyes: 0x524a41, haircut: "cropped",
-  defaultWardrobe: { top: "police-uniform", bottoms: "police-trousers", shoes: "dark-sneakers" },
-};
+const uniform = { top: "police-uniform", bottoms: "police-trousers", shoes: "dark-sneakers" } as const;
+export const policeAppearances = {
+  ramirez: {
+    skin: 0xbf8868, hair: 0x38252b, eyes: 0x533926, haircut: "ponytail",
+    silhouette: "tapered", defaultWardrobe: uniform,
+  },
+  jensen: {
+    skin: 0xc68c67, hair: 0x413027, eyes: 0x524a41, haircut: "cropped", defaultWardrobe: uniform,
+  },
+} as const satisfies Record<string, CharacterAppearance>;
+
+export const reinforcementLooks: readonly CharacterAppearance[] = [policeAppearances.ramirez, policeAppearances.jensen];

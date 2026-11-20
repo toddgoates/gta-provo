@@ -3,6 +3,31 @@ import { resolveWardrobe } from "../content/characters/wardrobe";
 import type { Wardrobe } from "../entities/Appearance";
 import type { Entity } from "../entities/EntityManager";
 
+// Stacked, bevelled rings keep the silhouette faceted without using extra animation bones.
+function contour(rings: readonly (readonly [y: number, width: number, depth: number])[]) {
+  const corners = [[-.38, -.5], [.38, -.5], [.5, -.32], [.5, .32],
+    [.38, .5], [-.38, .5], [-.5, .32], [-.5, -.32]];
+  const vertices: number[] = [], indices: number[] = [];
+  for (const [y, width, depth] of rings) {
+    for (const [x, z] of corners) vertices.push(x * width, y, z * depth);
+  }
+  for (let ring = 0; ring < rings.length - 1; ring++) {
+    for (let i = 0; i < 8; i++) {
+      const a = ring * 8 + i, b = ring * 8 + (i + 1) % 8;
+      indices.push(a, a + 8, b + 8, a, b + 8, b);
+    }
+  }
+  const top = (rings.length - 1) * 8;
+  for (let i = 1; i < 7; i++) indices.push(0, i, i + 1, top, top + i + 1, top + i);
+  const indexed = new THREE.BufferGeometry();
+  indexed.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  indexed.setIndex(indices);
+  const facets = indexed.toNonIndexed();
+  facets.computeVertexNormals();
+  indexed.dispose();
+  return facets;
+}
+
 export function buildCharacter(entity: Entity) {
   const { appearance } = entity.definition;
   const { wardrobe } = entity;
@@ -27,6 +52,7 @@ export function buildCharacter(entity: Entity) {
   const shoes = mat(0xffffff);
   const trim = mat(0xffffff);
   const seams = mat(0xffffff);
+  const tapered = appearance.silhouette === "tapered";
 
   function part(parent: THREE.Group, material: THREE.Material, x: number, y: number, z: number, w: number, h: number, d: number) {
     const mesh = new THREE.Mesh(cube, material);
@@ -36,9 +62,18 @@ export function buildCharacter(entity: Entity) {
     return mesh;
   }
 
-  part(group, shirt, 0, 1.18, 0, .55, .62, .34);
-  const placket = part(group, trim, 0, 1.21, -.179, .035, .56, .018);
-  part(group, pants, 0, .82, 0, .47, .16, .29);
+  if (tapered) {
+    group.add(new THREE.Mesh(contour([
+      [.87, .51, .32], [1.05, .37, .286], [1.29, .47, .355], [1.47, .50, .31], [1.50, .43, .29],
+    ]), shirt));
+    group.add(new THREE.Mesh(contour([
+      [.74, .46, .275], [.84, .52, .32], [.93, .46, .31],
+    ]), pants));
+  } else {
+    part(group, shirt, 0, 1.18, 0, .55, .62, .34);
+    part(group, pants, 0, .82, 0, .47, .16, .29);
+  }
+  const placket = part(group, trim, 0, 1.21, -.183, .035, .56, .018);
   part(group, skin, 0, 1.62, -.015, .34, .34, .31);
 
   if (appearance.haircut === "short") {
@@ -52,7 +87,11 @@ export function buildCharacter(entity: Entity) {
   } else {
     part(group, hair, 0, 1.8, -.015, .39, .12, .35);
     part(group, hair, 0, 1.63, .13, .35, .33, .12);
-    if (appearance.haircut === "long") {
+    if (appearance.haircut === "ponytail") {
+      const tail = part(group, hair, 0, 1.57, .246, .14, .38, .147);
+      tail.rotation.x = -.28;
+      part(group, hair, 0, 1.749, .205, .128, .125, .129);
+    } else if (appearance.haircut === "long") {
       part(group, hair, 0, 1.418, .18, .357, .52, .155);
       part(group, hair, -.167, 1.565, .014, .079, .419, .209);
       part(group, hair, .164, 1.59, .058, .086, .344, .16);
@@ -76,7 +115,7 @@ export function buildCharacter(entity: Entity) {
     part(group, eyes, side * .074, 1.648, -.181, .043, .044, .012);
 
     const leg = new THREE.Group();
-    leg.position.set(side * .13, .78, 0);
+    leg.position.set(side * (tapered ? .142 : .13), .78, 0);
     const knee = new THREE.Group();
     knee.position.y = -.33;
     part(leg, pants, 0, -.17, 0, .208, .35, .24);
@@ -88,7 +127,7 @@ export function buildCharacter(entity: Entity) {
     root.add(leg);
 
     const arm = new THREE.Group();
-    arm.position.set(side * .35, 1.44, 0);
+    arm.position.set(side * (tapered ? .305 : .35), 1.44, 0);
     const elbow = new THREE.Group();
     elbow.position.y = -.25;
     part(arm, skin, 0, -.135, 0, .133, .28, .154);

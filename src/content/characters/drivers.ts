@@ -4,6 +4,7 @@ import type { DriverProfile } from "../../entities/Appearance";
 export const drivers = {
   sienna: { gender: "female", appearance: {
     skin: 0x93614a, hair: 0x292332, eyes: 0x48323b, haircut: "long", build: "standard",
+    silhouette: "tapered",
     defaultWardrobe: { top: "berry-tee", bottoms: "sand-chinos", shoes: "dark-sneakers" },
   } },
   cal: { gender: "male", appearance: {
@@ -16,10 +17,12 @@ export const drivers = {
   } },
   mira: { gender: "female", appearance: {
     skin: 0xd2a17e, hair: 0xc29a52, eyes: 0x51758c, haircut: "bob", build: "slim",
+    silhouette: "tapered",
     defaultWardrobe: { top: "mint-tee", bottoms: "marla-trousers", shoes: "dark-sneakers" },
   } },
   jade: { gender: "female", appearance: {
     skin: 0xebbcab, hair: 0x673e46, eyes: 0x546a45, haircut: "cropped", build: "broad",
+    silhouette: "tapered",
     defaultWardrobe: { top: "brick-tee", bottoms: "slate-trousers", shoes: "dark-sneakers" },
   } },
   leon: { gender: "male", appearance: {

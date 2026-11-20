@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import { playerDefinition } from "../src/content/downtownStory";
+import { marlaDefinition } from "../src/content/downtownStory";
 import { EntityManager } from "../src/entities/EntityManager";
 import { buildCharacter } from "../src/render/CharacterView";
 import { equipGarment } from "../src/systems/WardrobeSystem";
@@ -33,4 +34,14 @@ it("updates clothing on the existing character rig", () => {
   equipGarment(player, "top", "gray-tee");
   view.updateWardrobe(player.wardrobe!);
   expect(sleeve.scale.y).toBe(.19);
+});
+
+it("uses the tapered silhouette without changing the character joint layout", () => {
+  const entities = new EntityManager();
+  const feet = { x: 0, y: 0, z: 0 };
+  const player = buildCharacter(entities.spawn("player", playerDefinition, feet));
+  const marla = buildCharacter(entities.spawn("marla", marlaDefinition, feet));
+  expect(Math.abs(marla.limbs[1].position.x)).toBeLessThan(Math.abs(player.limbs[1].position.x));
+  expect(Math.abs(marla.limbs[0].position.x)).toBeGreaterThan(Math.abs(player.limbs[0].position.x));
+  expect(marla.joints).toHaveLength(player.joints.length);
 });

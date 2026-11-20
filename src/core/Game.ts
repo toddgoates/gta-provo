@@ -1,7 +1,7 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { downtown } from "../content/downtown";
 import { downtownPedestrians } from "../content/pedestrians";
-import { policeAppearance, policeConfig, reinforcementPoints } from "../content/police";
+import { policeConfig, reinforcementLooks, reinforcementPoints } from "../content/police";
 import { createPedestrianLook } from "../content/characters/pedestrianLooks";
 import { downtownTraffic } from "../content/vehicles/downtownTraffic";
 import { dialogueCamera, firstShift, marlaDefinition, marlaDialogue, playerDefinition } from "../content/downtownStory";
@@ -100,9 +100,10 @@ export class Game {
       canSpawnAt: (point) => !this.physics.intersectionWithShape({ ...point, y: point.y + .83 },
         { x: 0, y: 0, z: 0, w: 1 }, new RAPIER.Capsule(.44, .29)),
       spawn: (point) => {
+        const appearance = reinforcementLooks[this.reinforcementId % reinforcementLooks.length];
         const officer = this.entities.spawn(`reinforcement-${++this.reinforcementId}`, {
           id: "reinforcement", kind: "npc", name: "Police officer", modelId: "pedestrian-proxy",
-          faction: "police", appearance: policeAppearance,
+          faction: "police", appearance,
         }, point);
         this.pedestrians.add(officer);
         this.view.addActor(officer);
@@ -199,7 +200,7 @@ export class Game {
   private advance = (dt: number): void => {
     const { policy } = this.director;
     this.health.step(dt);
-    const strike = this.input.take("KeyF");
+    const strike = this.input.takeAttack() && policy.walk;
     const attackSpeed = this.melee.attacking || strike ? .28 : 1;
     let walkDelta: Point | undefined;
     if (policy.walk) {

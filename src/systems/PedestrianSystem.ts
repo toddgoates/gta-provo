@@ -1,7 +1,6 @@
 import type { Entity, EntityManager, Point } from "../entities/EntityManager";
-import type { DriverProfile } from "../entities/Appearance";
+import type { CharacterAppearance, DriverProfile } from "../entities/Appearance";
 import type { RoadPose } from "./TrafficRoute";
-import { policeAppearance } from "../content/police";
 
 type Waypoint = readonly [x: number, z: number];
 export interface PedestrianGroupDefinition {
@@ -10,6 +9,7 @@ export interface PedestrianGroupDefinition {
   path: readonly Waypoint[];
   crossings?: readonly number[]; // Segment indices in the forward direction.
   faction?: "police";
+  appearance?: CharacterAppearance;
 }
 export interface Crosswalk { from: Point; to: Point }
 export interface CrossingTraffic extends RoadPose { speed: number; length: number; width: number }
@@ -70,7 +70,7 @@ export class PedestrianSystem {
     this.groups = definitions.map((definition) => {
       const origin = point(definition.path[0]);
       const walkers = Array.from({ length: definition.count }, (_, member) => {
-        const appearance = definition.faction === "police" ? policeAppearance : createProfile(index++).appearance;
+        const appearance = definition.appearance ?? createProfile(index++).appearance;
         const position = { ...origin, x: origin.x + (member % 2 ? .68 : 0), z: origin.z + (member === 2 ? 1 : 0) };
         const entity = entities.spawn(`ped-${definition.id}-${member}`, {
           id: definition.faction ?? "pedestrian", name: definition.faction === "police" ? "Police officer" : "Pedestrian",

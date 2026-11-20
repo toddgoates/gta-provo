@@ -1,5 +1,5 @@
 const heldKeys = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight", "Space"]);
-const actions = new Set(["Space", "KeyE", "KeyF"]);
+const actions = new Set(["Space", "KeyE"]);
 
 export class InputManager {
   private held = new Set<string>();
@@ -7,6 +7,7 @@ export class InputManager {
   private cleanup = new AbortController();
   private dx = 0;
   private dy = 0;
+  private attacks = 0;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -43,20 +44,36 @@ export class InputManager {
       if (document.hidden) { this.clear(); onBlur(); }
     }, options);
     let wasLocked = false;
+    let captureTried = false;
+    let dragDistance = 0;
     document.addEventListener("pointerlockchange", () => {
       const locked = document.pointerLockElement === canvas;
-      if (wasLocked && !locked && this.canLook()) onPause();
+      if (wasLocked && !locked) {
+        captureTried = false;
+        if (this.canLook()) onPause();
+      }
       wasLocked = locked;
     }, options);
-    canvas.addEventListener("click", () => {
-      if (this.canLook() && document.pointerLockElement !== canvas) {
+    canvas.addEventListener("mousedown", (event) => {
+      if (event.button === 0) dragDistance = 0;
+    }, options);
+    canvas.addEventListener("click", (event) => {
+      if (event.button !== 0 || !this.canLook()) return;
+      const locked = document.pointerLockElement === canvas;
+      if (!locked && dragDistance > 4) return;
+      // Capture on the first click without throwing an accidental punch.
+      if (!locked && !captureTried) {
+        captureTried = true;
         const lock = canvas.requestPointerLock?.();
         lock?.catch(() => { /* Drag-look remains available when lock is denied. */ });
+        return;
       }
+      this.attacks = Math.min(3, this.attacks + 1);
     }, options);
     window.addEventListener("mousemove", (event) => {
       if (!this.canLook()) return;
       if (document.pointerLockElement === canvas || ((event.buttons & 1) !== 0 && event.target === canvas)) {
+        if (document.pointerLockElement !== canvas) dragDistance += Math.hypot(event.movementX, event.movementY);
         this.dx += event.movementX;
         this.dy += event.movementY;
       }
@@ -65,6 +82,11 @@ export class InputManager {
 
   down(code: string): boolean { return this.held.has(code); }
   take(code: string): boolean { return this.pressed.delete(code); }
+  takeAttack(): boolean {
+    if (!this.attacks) return false;
+    this.attacks--;
+    return true;
+  }
   takeLook(): [number, number] {
     const delta: [number, number] = [this.dx, this.dy];
     this.dx = this.dy = 0;
@@ -73,6 +95,7 @@ export class InputManager {
   clear(): void {
     this.held.clear();
     this.pressed.clear();
+    this.attacks = 0;
     this.dx = this.dy = 0;
   }
   unlock(): void {
