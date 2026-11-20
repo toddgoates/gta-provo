@@ -36,6 +36,7 @@ Each future chunk can use the same district-style boundary: authored footprints/
 ## Adding content
 
 - **Entity:** Add an `EntityDefinition`, then spawn its instance with a unique stable ID and pose. Add a view/proxy for the `modelId`. For **E**, give it an interaction range and descriptor (`dialogue` or `use`); register a listener for new behavior rather than specializing the proximity test.
+- **Character and clothing:** Define skin, hair, eyes, and a default outfit in `src/content/characters/wardrobe.ts`. Each spawned character has its own equipped top, bottoms, and shoes. Add catalog items to a slot and equip them through `Game.equipPlayerGarment`; the renderer updates the outfit on the existing rig without changing the collision capsule or animation pivots. A wardrobe menu, ownership rules, and save persistence are not implemented.
 - **Dialogue:** Add a `DialogueDefinition` keyed by ID and assign it to an NPC interaction. Nodes identify the speaker and subtitle; set a `next` node or supply choices. A missing next node ID means end, an unknown referenced ID is an authoring error. Choices may be gated by a flag and set a flag. `audio` is optional metadata; playback is not implemented.
 - **Mission:** Register a `MissionDefinition` with stable ID, optional prerequisite IDs, ordered `when` event/payload matches, and optional reward. Add a location trigger to world data when needed, then reference its ID from the objective to show the marker. Wire the start to the appropriate game rule.
 

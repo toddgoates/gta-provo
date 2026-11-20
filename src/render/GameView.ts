@@ -3,56 +3,13 @@ import type { Entity, Point } from "../entities/EntityManager";
 import { CameraRig } from "./CameraRig";
 import { TrafficView } from "./TrafficView";
 import type { TrafficSystem } from "../systems/TrafficSystem";
-
-function buildPerson(modelId: string) {
-  const group = new THREE.Group();
-  const local = modelId === "local-proxy";
-  const materials = new Map<number, THREE.MeshLambertMaterial>();
-  const cube = new THREE.BoxGeometry(1, 1, 1);
-  function part(parent: THREE.Group, color: number, x: number, y: number, z: number, w: number, h: number, d: number) {
-    let material = materials.get(color);
-    if (!material) materials.set(color, material = new THREE.MeshLambertMaterial({ color, flatShading: true }));
-    const mesh = new THREE.Mesh(cube, material);
-    mesh.position.set(x, y, z);
-    mesh.scale.set(w, h, d);
-    parent.add(mesh);
-  }
-  const shirt = local ? 0xca7546 : 0x61857d;
-  const pants = local ? 0x414c67 : 0x4b4254;
-  const skin = local ? 0xba7856 : 0xd69b78;
-  part(group, shirt, 0, 1.18, 0, .55, .62, .34);
-  part(group, local ? 0x634f48 : 0xe5bd8d, 0, 1.21, -.179, .035, .56, .018);
-  part(group, pants, 0, .82, 0, .47, .16, .29);
-  part(group, skin, 0, 1.62, -.015, .34, .34, .31);
-  part(group, local ? 0x485875 : 0x653e46, 0, 1.8, -.015, .39, .12, .35);
-  if (local) part(group, 0x485875, 0, 1.759, -.225, .34, .04, .19);
-  else {
-    part(group, 0x653e46, 0, 1.63, .13, .35, .33, .12);
-    part(group, 0xe2b775, 0, 1.13, -.185, .12, .077, .026);
-  }
-  for (const side of [-1, 1]) part(group, 0x3a2f38, side * .083, 1.65, -.171, .035, .035, .02);
-  const limbs: THREE.Group[] = [];
-  for (const side of [-1, 1]) {
-    const leg = new THREE.Group();
-    leg.position.set(side * .13, .78, 0);
-    part(leg, pants, 0, -.34, 0, .208, .65, .24);
-    part(leg, 0x393741, 0, -.705, -.05, .22, .15, .34);
-    group.add(leg);
-    const arm = new THREE.Group();
-    arm.position.set(side * .35, 1.44, 0);
-    part(arm, shirt, 0, -.22, 0, .145, .48, .19);
-    part(arm, skin, 0, -.49, 0, .135, .15, .16);
-    group.add(arm);
-    limbs.push(leg, arm);
-  }
-  return { group, limbs };
-}
+import { buildCharacter } from "./CharacterView";
 
 export class GameView {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
   readonly rig = new CameraRig();
-  private actors = new Map<string, ReturnType<typeof buildPerson>>();
+  private actors = new Map<string, { entity: Entity; view: ReturnType<typeof buildCharacter> }>();
   private trafficViews: TrafficView[] = [];
   private marker = new THREE.Group();
   private crystal: THREE.Mesh;
@@ -97,11 +54,11 @@ export class GameView {
   }
 
   addActor(entity: Entity): void {
-    const actor = buildPerson(entity.definition.modelId);
-    actor.group.position.set(entity.position.x, entity.position.y, entity.position.z);
-    actor.group.rotation.y = entity.yaw;
-    this.actors.set(entity.id, actor);
-    this.scene.add(actor.group);
+    const view = buildCharacter(entity);
+    view.group.position.set(entity.position.x, entity.position.y, entity.position.z);
+    view.group.rotation.y = entity.yaw;
+    this.actors.set(entity.id, { entity, view });
+    this.scene.add(view.group);
   }
 
   addTraffic(traffic: TrafficSystem): void {
@@ -120,7 +77,10 @@ export class GameView {
 
   render(player: Entity, position: Point, speed: number, goal: Point | undefined, dt: number): void {
     this.time += dt;
-    const actor = this.actors.get(player.id)!;
+    for (const { entity, view } of this.actors.values()) {
+      if (entity.wardrobe) view.updateWardrobe(entity.wardrobe);
+    }
+    const actor = this.actors.get(player.id)!.view;
     actor.group.position.set(position.x, position.y, position.z);
     actor.group.rotation.y = player.yaw;
     const stride = Math.sin(this.time * (speed > 6 ? 14 : 10)) * Math.min(.65, speed * .085);

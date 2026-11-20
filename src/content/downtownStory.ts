@@ -2,12 +2,15 @@ import type { EntityDefinition } from "../entities/EntityManager";
 import type { DialogueDefinition } from "../systems/DialogueSystem";
 import type { MissionDefinition } from "../systems/MissionSystem";
 import type { SceneSequence } from "../systems/SequenceDirector";
+import { localAppearance, marlaAppearance } from "./characters/wardrobe";
 
 export const playerDefinition: EntityDefinition = {
   id: "local", name: "The New Local", kind: "player", modelId: "local-proxy",
+  appearance: localAppearance,
 };
 export const marlaDefinition: EntityDefinition = {
   id: "marla", name: "Marla", kind: "npc", modelId: "marla-proxy",
+  appearance: marlaAppearance,
   interaction: { kind: "dialogue", dialogueId: "marla-first-shift", prompt: "Talk to Marla", range: 2.9 },
 };
 export const dialogueCamera: SceneSequence = { mode: "dialogue", focus: "subject" };

@@ -8,6 +8,7 @@ export interface EntityDefinition {
   name: string;
   kind: EntityKind;
   modelId: string;
+  appearance?: CharacterAppearance;
   interaction?: Interaction;
 }
 
@@ -17,6 +18,7 @@ export interface Entity {
   position: Point; // Feet / placement origin, not collider center.
   yaw: number;
   enabled: boolean;
+  wardrobe?: Wardrobe;
 }
 
 export class EntityManager {
@@ -24,7 +26,11 @@ export class EntityManager {
 
   spawn(id: string, definition: EntityDefinition, position: Point, yaw = 0): Entity {
     if (this.entities.has(id)) throw new Error(`Duplicate entity ID: ${id}`);
-    const entity = { id, definition, position: { ...position }, yaw, enabled: true };
+    const defaults = definition.appearance?.defaultWardrobe;
+    const entity: Entity = {
+      id, definition, position: { ...position }, yaw, enabled: true,
+      wardrobe: defaults && { ...defaults },
+    };
     this.entities.set(id, entity);
     return entity;
   }
@@ -33,3 +39,4 @@ export class EntityManager {
   all(): Iterable<Entity> { return this.entities.values(); }
   clear(): void { this.entities.clear(); }
 }
+import type { CharacterAppearance, Wardrobe } from "./Appearance";

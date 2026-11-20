@@ -3,6 +3,7 @@ import { downtown } from "../content/downtown";
 import { downtownTraffic } from "../content/vehicles/downtownTraffic";
 import { dialogueCamera, firstShift, marlaDefinition, marlaDialogue, playerDefinition } from "../content/downtownStory";
 import { EntityManager } from "../entities/EntityManager";
+import type { Wardrobe } from "../entities/Appearance";
 import type { Entity, Point } from "../entities/EntityManager";
 import { GameView } from "../render/GameView";
 import { DialogueSystem } from "../systems/DialogueSystem";
@@ -12,6 +13,7 @@ import { MovementSystem } from "../systems/MovementSystem";
 import { SequenceDirector } from "../systems/SequenceDirector";
 import { TriggerSystem } from "../systems/TriggerSystem";
 import { TrafficSystem } from "../systems/TrafficSystem";
+import { equipGarment } from "../systems/WardrobeSystem";
 import type { HudSnapshot } from "../ui/hudStore";
 import { WorldManager } from "../world/WorldManager";
 import { EventBus } from "./EventBus";
@@ -119,6 +121,10 @@ export class Game {
     if (this.director.mode !== "dialogue") return;
     this.dialogue.advance(choiceId);
     this.publishHud();
+  }
+
+  equipPlayerGarment(slot: keyof Wardrobe, garmentId: string): boolean {
+    return !this.disposed && equipGarment(this.player, slot, garmentId);
   }
 
   dispose(): void {

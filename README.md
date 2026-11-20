@@ -39,6 +39,7 @@ Open the URL printed by Vite (normally `http://localhost:5173`). Walk toward **M
 - Fixed-step Rapier capsule movement with gravity, curb stepping, jumping, and building collision; a follow camera with wall obstruction.
 - Six low-poly NPC cars in three body styles. They keep right, brake behind other cars, take turns at the four-way stop, and yield to the player.
 - One NPC, one branching text conversation, and one event-driven mission with a destination marker and a $15 reward.
+- A blond, blue-eyed player in a light gray tee and blue jeans. Clothing is defined in swappable slots; there is no wardrobe menu yet.
 - A mission HUD, north-up minimap, pause menu, and development-only debug readout.
 
 No player-drivable vehicles, audio, GLB assets, saves, or backend are shipped. Rapier’s compatibility package embeds WASM, so Vite can warn about the initial bundle size even when the build succeeds. See [Architecture](ARCHITECTURE.md) and [Game Design](GAME_DESIGN.md).
