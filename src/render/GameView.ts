@@ -16,6 +16,7 @@ export class GameView {
   private actors = new Map<string, { entity: Entity; view: ReturnType<typeof buildCharacter> }>();
   private trafficViews: TrafficView[] = [];
   private driverViews = new Map<string, ReturnType<typeof buildCharacter>>();
+  private downedMarks = new Map<string, THREE.Mesh>();
   private marker = new THREE.Group();
   private crystal: THREE.Mesh;
   private shadow = new THREE.Mesh(new THREE.CircleGeometry(.49, 12),
@@ -107,10 +108,34 @@ export class GameView {
       const { x, y, z } = entity.position;
       view.group.position.set(previous.x + (x - previous.x) * alpha, previous.y + (y - previous.y) * alpha,
         previous.z + (z - previous.z) * alpha);
-      view.group.rotation.y = entity.yaw;
+      const fall = melee.fallProgress(entity.id);
+      view.group.rotation.set(fall === undefined ? 0 : Math.PI * .5 * fall * fall,
+        entity.yaw, 0, "YXZ");
+      if (fall !== undefined) {
+        view.group.position.y += .19 * fall;
+        poseCharacter(view, 0);
+        view.limbs[1].rotation.z = -.48 * fall;
+        view.limbs[3].rotation.z = .63 * fall;
+        view.joints[1].rotation.x = .22 * fall;
+        view.joints[2].rotation.x = -.12 * fall;
+        if (fall === 1) this.addDownedMark(entity);
+        continue;
+      }
       poseCharacter(view, Math.sin(this.time * (speed > 4 ? 13 : speed > 2 ? 9 : 7) + phase) * Math.min(.66, speed * .175),
         melee.getPose(entity.id));
     }
+  }
+
+  private addDownedMark(entity: Entity): void {
+    if (this.downedMarks.has(entity.id)) return;
+    const { x, y, z } = entity.position;
+    const stain = new THREE.Mesh(new THREE.CircleGeometry(.32, 9),
+      new THREE.MeshBasicMaterial({ color: 0x6d292b, transparent: true, opacity: .68, depthWrite: false }));
+    stain.rotation.x = -Math.PI / 2;
+    stain.scale.set(1.35, .8, 1);
+    stain.position.set(x + Math.sin(entity.yaw) * .98 + .14, y + .012, z + Math.cos(entity.yaw) * .98);
+    this.downedMarks.set(entity.id, stain);
+    this.scene.add(stain);
   }
 
   render(player: Entity, position: Point, speed: number, goal: Point | undefined, dt: number, seated = false, melee?: MeleePose): void {

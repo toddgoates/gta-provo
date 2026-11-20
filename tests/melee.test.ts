@@ -4,7 +4,7 @@ import { EntityManager } from "../src/entities/EntityManager";
 import { poseCharacter } from "../src/render/CharacterMotion";
 import { buildCharacter } from "../src/render/CharacterView";
 import { HealthSystem } from "../src/systems/HealthSystem";
-import { MeleeSystem } from "../src/systems/MeleeSystem";
+import { MAX_PEDESTRIAN_HEALTH, MeleeSystem } from "../src/systems/MeleeSystem";
 
 function setup(random: number, z = 11, clear = true) {
   const entities = new EntityManager();
@@ -75,4 +75,27 @@ it("a fighter still counterattacks after taking a full combo and waiting past th
   let damage = 0;
   for (let i = 0; i < 90; i++) damage += melee.step(1 / 60, false, true);
   expect(damage).toBeGreaterThan(0);
+});
+
+it("tracks punch and kick damage and keeps a downed NPC motionless and out of combat", () => {
+  const { melee, npc } = setup(.95);
+  expect(melee.healthOf(npc.id)).toBe(MAX_PEDESTRIAN_HEALTH);
+  for (let i = 0; i < 100; i++) melee.step(1 / 60, i === 0 || i === 5 || i === 10, true);
+  expect(melee.healthOf(npc.id)).toBe(MAX_PEDESTRIAN_HEALTH - 9 - 12 - 16);
+  expect(melee.fallProgress(npc.id)).toBeUndefined();
+
+  for (let i = 0; i < 80; i++) melee.step(1 / 60, i === 0 || i === 5 || i === 10, true);
+  expect(melee.healthOf(npc.id)).toBe(0);
+  const fall = melee.fallProgress(npc.id)!;
+  expect(fall).toBeGreaterThan(0);
+  expect(fall).toBeLessThan(1);
+  const position = npc.position;
+  let damage = 0;
+  for (let i = 0; i < 240; i++) damage += melee.step(1 / 60, i % 30 === 0, true);
+  expect(damage).toBe(0);
+  expect(npc.position).toEqual(position);
+  expect(melee.reactionSpeed(npc.id)).toBe(0);
+  expect(melee.getPose(npc.id)).toBeUndefined();
+  expect(melee.fallProgress(npc.id)).toBe(1);
+  expect(melee.healthOf(npc.id)).toBe(0);
 });

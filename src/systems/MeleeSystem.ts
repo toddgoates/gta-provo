@@ -6,9 +6,14 @@ export const meleeMoves = [
   { duration: .61, impact: .32, reach: 1.65, damage: 16 },
 ] as const;
 
+export const MAX_PEDESTRIAN_HEALTH = 60;
+const FALL_DURATION = .55;
+
 export interface MeleePose { move: number; progress: number; flinch: number }
 interface Swing { move: number; elapsed: number }
 interface Fighter {
+  health: number;
+  fallElapsed: number;
   swing?: Swing;
   response: "flee" | "fight";
   time: number;
@@ -41,6 +46,12 @@ export class MeleeSystem {
   get attacking(): boolean { return !!this.swing; }
   hasReactor(id: string): boolean { return this.fighters.has(id); }
   reactionSpeed(id: string): number { return this.fighters.get(id)?.speed ?? 0; }
+  healthOf(id: string): number { return this.fighters.get(id)?.health ?? MAX_PEDESTRIAN_HEALTH; }
+
+  fallProgress(id: string): number | undefined {
+    const fighter = this.fighters.get(id);
+    return fighter?.health === 0 ? fighter.fallElapsed / FALL_DURATION : undefined;
+  }
 
   getPose(id: string): MeleePose | undefined {
     const fighter = this.fighters.get(id);
@@ -66,9 +77,10 @@ export class MeleeSystem {
       const swing = this.swing;
       const move = meleeMoves[swing.move];
       if (this.advanceSwing(swing, dt)) {
-        const target = this.pedestrians.filter((npc) => canTarget(npc.id) && this.inReach(this.player, npc, swing.move))
+        const target = this.pedestrians.filter((npc) =>
+          this.healthOf(npc.id) > 0 && canTarget(npc.id) && this.inReach(this.player, npc, swing.move))
           .sort((a, b) => distance(this.player.position, a.position) - distance(this.player.position, b.position))[0];
-        if (target) this.react(target.id);
+        if (target) this.hit(target, move.damage);
       }
       if (swing.elapsed >= move.duration) {
         this.swing = this.queued ? { move: (swing.move + 1) % meleeMoves.length, elapsed: 0 } : undefined;
@@ -85,6 +97,10 @@ export class MeleeSystem {
       const fighter = this.fighters.get(npc.id);
       if (!fighter) continue;
       fighter.speed = 0;
+      if (fighter.health === 0) {
+        fighter.fallElapsed = Math.min(FALL_DURATION, fighter.fallElapsed + dt);
+        continue;
+      }
       fighter.stun = Math.max(0, fighter.stun - dt);
       fighter.cooldown = Math.max(0, fighter.cooldown - dt);
       fighter.time = Math.max(0, fighter.time - dt);
@@ -137,16 +153,31 @@ export class MeleeSystem {
     return Math.cos(direction(from.position, to.position) - from.yaw) > .35 && this.clearPath(from.position, to.position);
   }
 
-  private react(id: string): void {
-    const fighter = this.fighters.get(id);
-    if (fighter) {
-      fighter.stun = .28;
-      fighter.swing = undefined;
-      if (fighter.response === "flee") fighter.time = 4;
-    } else {
+  private hit(target: Entity, damage: number): void {
+    let fighter = this.fighters.get(target.id);
+    if (!fighter) {
       const response = this.random() < .5 ? "flee" : "fight";
-      this.fighters.set(id, { response, time: response === "flee" ? 4 : 0,
-        stun: .32, cooldown: .6, nextMove: 0, speed: 0 });
+      fighter = { health: MAX_PEDESTRIAN_HEALTH, fallElapsed: 0, response, time: 0,
+        stun: 0, cooldown: .6, nextMove: 0, speed: 0 };
+      this.fighters.set(target.id, fighter);
+    }
+    fighter.health = Math.max(0, fighter.health - damage);
+    fighter.swing = undefined;
+    if (fighter.health > 0) {
+      fighter.stun = .3;
+      if (fighter.response === "flee") fighter.time = 4;
+      return;
+    }
+    fighter.stun = 0;
+    const from = target.position;
+    // Prefer falling away from the strike, but turn the fall if there's a wall behind the NPC.
+    const faceAttacker = direction(from, this.player.position);
+    for (const offset of [0, Math.PI / 2, -Math.PI / 2, Math.PI]) {
+      const yaw = faceAttacker + offset;
+      if (this.clearPath(from, { x: from.x + Math.sin(yaw) * 1.55, y: from.y, z: from.z + Math.cos(yaw) * 1.55 })) {
+        target.yaw = yaw;
+        break;
+      }
     }
   }
 

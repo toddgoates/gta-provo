@@ -48,5 +48,6 @@ To take a car, approach it while it's stopped or crawling and press **E** when p
 - A mission HUD, north-up minimap, pause menu, and development-only debug readout.
 - A red health bar that starts at 100%. Fast traffic impacts on foot reduce health. At zero, **Start over** resets the run.
 - Ambient pedestrians may flee or fight back after being hit. Those who fight stay committed, even after taking a full combo. Their counterattacks reduce player health. Marla remains a dialogue-only NPC.
+- Ambient pedestrians have hidden health. When it reaches zero they collapse, stop fighting, and stay down.
 
 No vehicle damage, audio, GLB assets, saves, or backend are shipped. Rapier’s compatibility package embeds WASM, so Vite can warn about the initial bundle size even when the build succeeds. See [Architecture](ARCHITECTURE.md) and [Game Design](GAME_DESIGN.md).
