@@ -59,6 +59,13 @@ export function buildCharacter(entity: Entity) {
     }
   }
 
+  if (entity.definition.faction === "police") {
+    const cap = mat(0x24324e);
+    part(group, cap, 0, 1.823, -.013, .403, .103, .372);
+    part(group, cap, 0, 1.783, -.214, .363, .031, .132);
+    part(group, mat(0xd5b170), -.117, 1.334, -.176, .083, .081, .023);
+  }
+
   const limbs: THREE.Group[] = [];
   const joints: THREE.Group[] = [];
   const sleeves: THREE.Mesh[] = [];

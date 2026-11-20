@@ -24,6 +24,12 @@ Open the URL printed by Vite (normally `http://localhost:5173`). Walk toward **M
 | Esc | Pause or resume; releasing pointer lock also pauses |
 | F1 | Toggle the debug panel (development only) |
 
+### Wanted level
+
+Two officers patrol on foot. A civilian assault or vehicle theft only earns a wanted dot if a nearby officer has a clear view. A witnessed civilian knockout or a hit on an officer starts at two dots; knocking out an officer starts at three. Repeated detected offenses can raise the level further. Police investigate and chase on foot, including if you get in a vehicle. Break their line of sight for 20 seconds to lose one dot. A fresh run starts at zero.
+
+Levels 1–3 call for 1, 2, and 4 responding officers respectively; levels 4–5 currently use the four-officer fallback. The development-only **F1** panel shows responders, visibility, and the decay timer, with controls for all five levels.
+
 To take a car, approach it while it's stopped or crawling and press **E** when prompted. In the car, **W** accelerates, **A/D** steer, **S** brakes then reverses, and **Space** brakes without reversing. Press **E** to stop and get out. If the exit is blocked, move the car and try again.
 
 ## Commands

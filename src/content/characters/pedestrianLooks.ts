@@ -3,8 +3,8 @@ import { drivers } from "./drivers";
 import { garments } from "./wardrobe";
 
 const profiles = Object.values(drivers);
-const tops = Object.keys(garments.top).filter((id) => id !== "marla-cardigan");
-const bottoms = Object.keys(garments.bottoms);
+const tops = Object.keys(garments.top).filter((id) => id !== "marla-cardigan" && !id.startsWith("police-"));
+const bottoms = Object.keys(garments.bottoms).filter((id) => !id.startsWith("police-"));
 
 export function createPedestrianLook(index: number, random = Math.random): DriverProfile {
   const pick = <T>(values: readonly T[]): T => values[Math.floor(random() * values.length)];

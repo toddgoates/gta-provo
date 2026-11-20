@@ -39,7 +39,8 @@ function App() {
     <main className="app">
       <div ref={mount} className="world" />
       {status === "ready" ?
-        <HUD pause={() => game.current?.togglePause()} advance={(id) => game.current?.advanceDialogue(id)} restart={restart} /> :
+        <HUD pause={() => game.current?.togglePause()} advance={(id) => game.current?.advanceDialogue(id)} restart={restart}
+          setWanted={import.meta.env.DEV ? (level) => game.current?.setDebugWanted(level) : undefined} /> :
         <div className="loading" role={status === "error" ? "alert" : "status"}>
           <div className="brand">PROVO<span>.</span></div>
           <p>{status === "error" ? "Couldn’t start the game. A browser with WebGL 2 enabled is required." : "Loading downtown…"}</p>

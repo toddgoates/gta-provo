@@ -10,6 +10,7 @@ export const garments = {
     "blue-jacket": { color: 0x4a6bb4, sleeves: "long", trim: 0x899dd1 },
     "mint-tee": { color: 0x80b39c, sleeves: "short", trim: null },
     "brick-tee": { color: 0xb3563d, sleeves: "short", trim: null },
+    "police-uniform": { color: 0x344a70, sleeves: "short", trim: null },
   },
   bottoms: {
     "blue-jeans": { color: 0x426792, seam: 0x375478 },
@@ -18,6 +19,7 @@ export const garments = {
     "olive-chinos": { color: 0x6e7850, seam: null },
     "slate-trousers": { color: 0x626c79, seam: null },
     "dark-jeans": { color: 0x303e55, seam: 0x45566d },
+    "police-trousers": { color: 0x283650, seam: 0x505e78 },
   },
   shoes: {
     "dark-sneakers": { color: 0x393741 },

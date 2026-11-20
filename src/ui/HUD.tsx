@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef } from "react";
 import { downtown } from "../content/downtown";
 import { DialogueBox } from "./DialogueBox";
 import type { HudSnapshot } from "./hudStore";
+import type { WantedLevel } from "../systems/WantedLevelSystem";
 import { useHud } from "./hudStore";
 
 const DebugMenu = import.meta.env.DEV ? lazy(() => import("./DebugMenu")) : null;
@@ -55,7 +56,9 @@ function DeathScreen({ restart }: { restart: () => void }) {
   );
 }
 
-export function HUD({ pause, advance, restart }: { pause: () => void; advance: (choiceId?: string) => void; restart: () => void }) {
+export function HUD({ pause, advance, restart, setWanted }: {
+  pause: () => void; advance: (choiceId?: string) => void; restart: () => void; setWanted?: (level: WantedLevel) => void;
+}) {
   const hud = useHud((s) => s.snapshot);
   if (!hud) return null;
   const inScene = hud.mode === "dialogue" || hud.mode === "paused" || hud.mode === "dead";
@@ -68,6 +71,10 @@ export function HUD({ pause, advance, restart }: { pause: () => void; advance: (
           <div className="health-label" aria-hidden="true"><span>Health</span><span>{hud.health}%</span></div>
           <div className="health-track" role="progressbar" aria-label="Health" aria-valuenow={hud.health} aria-valuemin={0} aria-valuemax={100}>
             <div className="health-fill" style={{ width: `${hud.health}%` }} />
+          </div>
+          <div className="wanted" role="meter" aria-label="Wanted level" aria-valuenow={hud.wanted} aria-valuemin={0} aria-valuemax={5}>
+            <span aria-hidden="true">Wanted</span>
+            {[1, 2, 3, 4, 5].map((dot) => <i key={dot} className={hud.wanted >= dot ? "lit" : ""} aria-hidden="true" />)}
           </div>
         </div>
       </div>
@@ -105,7 +112,7 @@ export function HUD({ pause, advance, restart }: { pause: () => void; advance: (
       {hud.mode === "dialogue" && hud.dialogue && <DialogueBox dialogue={hud.dialogue} advance={advance} />}
       {hud.mode === "paused" && <PauseMenu resume={pause} />}
       {hud.mode === "dead" && <DeathScreen restart={restart} />}
-      {DebugMenu && hud.debug && <Suspense fallback={null}><DebugMenu hud={hud} /></Suspense>}
+      {DebugMenu && hud.debug && <Suspense fallback={null}><DebugMenu hud={hud} setWanted={setWanted} /></Suspense>}
     </div>
   );
 }

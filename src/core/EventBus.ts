@@ -1,4 +1,19 @@
+import type { Point } from "../entities/EntityManager";
+
+export interface CrimeIncident {
+  id: string;
+  offenderId: string;
+  victimId: string;
+  position: Point;
+}
+
 export interface GameEvents {
+  "combat:hit": CrimeIncident & { knockedOut: boolean };
+  "civilian:assaulted": CrimeIncident;
+  "civilian:knocked_out": CrimeIncident;
+  "police:assaulted": CrimeIncident;
+  "police:knocked_out": CrimeIncident;
+  "vehicle:stolen": CrimeIncident;
   "interaction:used": { entityId: string };
   "dialogue:completed": { dialogueId: string; npcId: string };
   "dialogue:choice": { dialogueId: string; choiceId: string };

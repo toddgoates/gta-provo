@@ -17,6 +17,8 @@ Start at Center & University near the Soda Dept. Talk to Marla Jensen, choose a 
 
 The playable grid is three built blocks plus a public plaza. One static NPC, a few text lines, and one walking route are sufficient to validate the loop. Light NPC traffic makes crossing University Avenue feel like crossing a street: compact cars, sedans, and pickups follow their lanes and take turns at the four-way stop.
 
+Uniformed foot patrols notice nearby offenses with a clear view. Wanted dots increase with witnessed or direct offenses against police, and disappear one at a time after breaking sight. The first three levels escalate infantry response; the last two currently reuse the level-three response.
+
 ## Deferred
 
 Broader districts and neighborhood streaming, interiors, freeform pedestrian navigation, turning between streets and larger traffic networks, vehicle damage and crash reactions, optional activities, a campaign, local saves, GLB art, voice acting, radio/music and ambience, day/night, and multi-step cutscenes. No external generation APIs are required to run the game.

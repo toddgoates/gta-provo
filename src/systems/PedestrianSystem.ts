@@ -1,6 +1,7 @@
 import type { Entity, EntityManager, Point } from "../entities/EntityManager";
 import type { DriverProfile } from "../entities/Appearance";
 import type { RoadPose } from "./TrafficRoute";
+import { policeAppearance } from "../content/police";
 
 type Waypoint = readonly [x: number, z: number];
 export interface PedestrianGroupDefinition {
@@ -8,6 +9,7 @@ export interface PedestrianGroupDefinition {
   count: number;
   path: readonly Waypoint[];
   crossings?: readonly number[]; // Segment indices in the forward direction.
+  faction?: "police";
 }
 export interface Crosswalk { from: Point; to: Point }
 export interface CrossingTraffic extends RoadPose { speed: number; length: number; width: number }
@@ -51,7 +53,8 @@ export function crossingIsClear({ from, to }: Crosswalk, traffic: readonly Cross
 }
 
 export class PedestrianSystem {
-  readonly walkers: readonly Pedestrian[];
+  private actors: Pedestrian[];
+  get walkers(): readonly Pedestrian[] { return this.actors; }
   private groups: Group[];
   private crossingWalkers = new Set<string>();
 
@@ -67,25 +70,33 @@ export class PedestrianSystem {
     this.groups = definitions.map((definition) => {
       const origin = point(definition.path[0]);
       const walkers = Array.from({ length: definition.count }, (_, member) => {
-        const { appearance } = createProfile(index++);
+        const appearance = definition.faction === "police" ? policeAppearance : createProfile(index++).appearance;
         const position = { ...origin, x: origin.x + (member % 2 ? .68 : 0), z: origin.z + (member === 2 ? 1 : 0) };
         const entity = entities.spawn(`ped-${definition.id}-${member}`, {
-          id: "pedestrian", name: "Pedestrian", kind: "npc", modelId: "pedestrian-proxy", appearance,
+          id: definition.faction ?? "pedestrian", name: definition.faction === "police" ? "Police officer" : "Pedestrian",
+          kind: "npc", modelId: "pedestrian-proxy", appearance, faction: definition.faction,
         }, position, definition.path.length === 1 ? member * 2.1 : 0);
         return { entity, previous: entity.position, speed: 0, phase: this.random() * Math.PI * 2 };
       });
       return { definition, walkers, from: 0, direction: 1, t: 0, wait: this.random() * 2, speed: 1.55 + this.random() * .45 };
     });
-    this.walkers = this.groups.flatMap(({ walkers }) => walkers);
+    this.actors = this.groups.flatMap(({ walkers }) => walkers);
   }
+
+  add(entity: Entity): void {
+    this.actors.push({ entity, previous: entity.position, speed: 0, phase: this.random() * Math.PI * 2 });
+  }
+
+  remove(id: string): void { this.actors = this.actors.filter(({ entity }) => entity.id !== id); }
 
   step(dt: number, traffic: readonly CrossingTraffic[], reacting: (id: string) => boolean = () => false): Crosswalk[] {
     const crossings: Crosswalk[] = [];
     this.crossingWalkers.clear();
+    for (const walker of this.walkers) { walker.previous = walker.entity.position; walker.speed = 0; }
     for (const group of this.groups) {
       const { path, crossings: marked } = group.definition;
-      for (const walker of group.walkers) { walker.previous = walker.entity.position; walker.speed = 0; }
       if (path.length < 2) continue;
+      if (group.walkers.every(({ entity }) => reacting(entity.id))) continue;
       if (group.wait > 0) { group.wait -= dt; continue; }
       const next = group.from + group.direction;
       const from = point(path[group.from]), to = point(path[next]);

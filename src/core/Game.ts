@@ -1,6 +1,7 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { downtown } from "../content/downtown";
 import { downtownPedestrians } from "../content/pedestrians";
+import { policeAppearance, policeConfig, reinforcementPoints } from "../content/police";
 import { createPedestrianLook } from "../content/characters/pedestrianLooks";
 import { downtownTraffic } from "../content/vehicles/downtownTraffic";
 import { dialogueCamera, firstShift, marlaDefinition, marlaDialogue, playerDefinition } from "../content/downtownStory";
@@ -12,6 +13,10 @@ import { DialogueSystem } from "../systems/DialogueSystem";
 import { InteractionSystem } from "../systems/InteractionSystem";
 import { HealthSystem } from "../systems/HealthSystem";
 import { MeleeSystem } from "../systems/MeleeSystem";
+import { CrimeSystem } from "../systems/CrimeSystem";
+import { WantedLevelSystem } from "../systems/WantedLevelSystem";
+import type { WantedLevel } from "../systems/WantedLevelSystem";
+import { PoliceResponseSystem } from "../systems/PoliceResponseSystem";
 import { MissionSystem } from "../systems/MissionSystem";
 import { MovementSystem } from "../systems/MovementSystem";
 import { SequenceDirector } from "../systems/SequenceDirector";
@@ -47,6 +52,10 @@ export class Game {
   private npc = this.entities.spawn("marla-downtown", marlaDefinition, downtown.spawns.npc, Math.PI + .42);
   private pedestrians = new PedestrianSystem(this.entities, downtownPedestrians, createPedestrianLook);
   private melee: MeleeSystem;
+  private wanted = new WantedLevelSystem(() => this.publishHud());
+  private police: PoliceResponseSystem;
+  private crime: CrimeSystem;
+  private reinforcementId = 0;
   private view: GameView;
   private physics: RAPIER.World;
   private district: WorldManager;
@@ -74,15 +83,46 @@ export class Game {
     this.district = new WorldManager(this.physics, downtown);
     this.view.scene.add(this.district.root);
     this.movement = new MovementSystem(this.physics, this.player);
-    this.melee = new MeleeSystem(this.player, this.pedestrians.walkers.map(({ entity }) => entity), (from, to) => {
-      const ray = new RAPIER.Ray({ ...from, y: from.y + .88 }, { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z });
-      return !this.physics.castRay(ray, 1, true, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, this.movement.collider);
-    });
+    this.melee = new MeleeSystem(this.player, () => this.pedestrians.walkers.map(({ entity }) => entity),
+      (from, to) => this.clearSight(from, to, .88), Math.random, (hit) => this.events.emit("combat:hit", hit));
     this.view.addActor(this.player);
     this.view.addActor(this.npc);
     for (const { entity } of this.pedestrians.walkers) this.view.addActor(entity);
     this.view.addTraffic(this.traffic);
-    this.vehicles = new VehicleSystem(this.physics, this.traffic);
+    this.vehicles = new VehicleSystem(this.physics, this.traffic, this.events);
+    const officers = () => this.pedestrians.walkers.flatMap(({ entity }) => entity.definition.faction === "police" ? [entity] : []);
+    const conscious = (id: string) => this.melee.healthOf(id) > 0;
+    this.police = new PoliceResponseSystem(this.wanted, {
+      officers, active: conscious,
+      clearSight: (a, b) => this.clearSight(a, b, 1.25),
+      clearRoute: (a, b) => this.clearSight(a, b, .85, true),
+      isOnScreen: (point) => this.view.isOnScreen(point),
+      canSpawnAt: (point) => !this.physics.intersectionWithShape({ ...point, y: point.y + .83 },
+        { x: 0, y: 0, z: 0, w: 1 }, new RAPIER.Capsule(.44, .29)),
+      spawn: (point) => {
+        const officer = this.entities.spawn(`reinforcement-${++this.reinforcementId}`, {
+          id: "reinforcement", kind: "npc", name: "Police officer", modelId: "pedestrian-proxy",
+          faction: "police", appearance: policeAppearance,
+        }, point);
+        this.pedestrians.add(officer);
+        this.view.addActor(officer);
+        return officer;
+      },
+      remove: (id) => {
+        this.pedestrians.remove(id);
+        this.melee.forget(id);
+        this.view.removeActor(id);
+        this.entities.remove(id);
+      },
+    }, reinforcementPoints);
+    this.crime = new CrimeSystem(this.events, this.player.id, {
+      findEntity: (id) => this.entities.get(id), officers, conscious,
+      clearSight: (a, b) => this.clearSight(a, b, 1.25), radius: policeConfig.witnessRadius,
+      detected: (incident) => {
+        this.police.investigate(incident);
+        this.wanted.report(incident.kind);
+      },
+    });
 
     this.input = new InputManager(this.view.renderer.domElement,
       () => this.director.policy.walk || this.director.policy.drive,
@@ -136,12 +176,17 @@ export class Game {
     return !this.disposed && equipGarment(this.player, slot, garmentId);
   }
 
+  setDebugWanted(level: WantedLevel): void {
+    if (import.meta.env.DEV && this.director.mode !== "dead") this.wanted.setLevel(level);
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     this.loop.stop();
     this.input.dispose();
     this.mission.dispose();
+    this.crime.dispose();
     this.events.clear();
     this.movement.dispose();
     this.vehicles.dispose();
@@ -171,7 +216,8 @@ export class Game {
     if (policy.drive && use) this.vehicles.exitRequested = true;
     const crossings = this.pedestrians.step(dt, this.traffic.cars.map((car) => ({
       ...this.traffic.pose(car, 1), speed: car.speed, length: car.spawn.model.length, width: car.spawn.model.width,
-    })), (id) => this.melee.hasReactor(id));
+    })), (id) => this.entities.get(id)?.definition.faction === "police"
+      ? this.police.controls(id) || this.melee.healthOf(id) === 0 : this.melee.hasReactor(id));
     this.vehicles.step(dt, {
       throttle: Number(this.input.down("KeyW")) - Number(this.input.down("KeyS")),
       steer: Number(this.input.down("KeyA")) - Number(this.input.down("KeyD")),
@@ -182,10 +228,10 @@ export class Game {
     this.physics.step();
     const occupied = this.vehicles.occupied;
     if (occupied) {
-      this.melee.step(dt, false, false);
       const { x, z, yaw } = this.traffic.pose(occupied, 1);
       this.player.position = { x, y: 0, z };
       this.player.yaw = yaw;
+      this.melee.step(dt, false, false, undefined, this.police.step(dt, this.player.position));
       if (this.vehicles.exitRequested) {
         const exit = this.vehicles.exit();
         if (exit) {
@@ -201,12 +247,14 @@ export class Game {
     }
     if (!policy.walk) return;
     this.movement.commit(dt);
-    const counterDamage = this.melee.step(dt, strike, true, (id) => !this.pedestrians.isCrossing(id));
+    const counterDamage = this.melee.step(dt, strike, true, (id) => !this.pedestrians.isCrossing(id),
+      this.police.step(dt, this.player.position));
     const counterHit = this.health.applyMeleeHit(counterDamage);
     if (counterHit) this.melee.playerHit();
     if (this.health.applyTrafficImpact(impact) || counterHit) {
       if (this.health.depleted) {
         this.director.die();
+        this.police.reset();
         this.input.clear();
         this.input.unlock();
       }
@@ -219,7 +267,7 @@ export class Game {
     if (!use || this.melee.attacking) return;
     if (this.candidate) this.interaction.use(this.candidate);
     else if (this.carCandidate && this.director.setFreeMode("driving")) {
-      this.vehicles.enter(this.carCandidate, this.player.position);
+      this.vehicles.enter(this.carCandidate, this.player.position, this.player.id);
       this.movement.board();
       this.carCandidate = null;
       this.input.clear();
@@ -227,6 +275,16 @@ export class Game {
       this.publishHud();
     }
   };
+
+  private clearSight(from: Point, to: Point, height: number, fixedOnly = false): boolean {
+    const direction = { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z };
+    if (Math.hypot(direction.x, direction.y, direction.z) < .02) return true;
+    const ray = new RAPIER.Ray({ ...from, y: from.y + height }, direction);
+    const flags = RAPIER.QueryFilterFlags.EXCLUDE_SENSORS | (fixedOnly ? RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC : 0);
+    const occupied = this.vehicles?.occupiedCollider;
+    return !this.physics.castRay(ray, 1, true, flags, undefined, this.movement.collider,
+      undefined, (collider) => collider.handle !== occupied?.handle);
+  }
 
   private render = (dt: number, alpha: number): void => {
     const { position } = this.player;
@@ -273,6 +331,7 @@ export class Game {
     this.publish({
       mode: this.director.mode,
       health: this.health.value,
+      wanted: this.wanted.level,
       mission: current && { title: current.mission.title, objective: current.objective.text },
       dialogue: this.dialogue.view,
       prompt: this.director.policy.interact ? this.candidate?.definition.interaction?.prompt ??
@@ -285,7 +344,8 @@ export class Game {
       money: this.money,
       complete: this.complete,
       locked: document.pointerLockElement === this.view.renderer.domElement,
-      debug: import.meta.env.DEV && this.debug ? { fps: Math.round(this.fps) } : null,
+      debug: import.meta.env.DEV && this.debug ? { fps: Math.round(this.fps), responders: this.police.count,
+        seenByPolice: this.police.visible, wantedDecay: this.wanted.timeToDecay } : null,
     });
   }
 }

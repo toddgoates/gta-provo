@@ -67,6 +67,28 @@ export class GameView {
     this.scene.add(view.group);
   }
 
+  removeActor(id: string): void {
+    const actor = this.actors.get(id);
+    if (actor) {
+      this.disposeMeshes(actor.view.group);
+      actor.view.group.removeFromParent();
+      this.actors.delete(id);
+    }
+    const stain = this.downedMarks.get(id);
+    if (stain) {
+      this.disposeMeshes(stain);
+      stain.removeFromParent();
+      this.downedMarks.delete(id);
+    }
+  }
+
+  isOnScreen(point: Point): boolean {
+    const camera = this.rig.camera;
+    camera.updateMatrixWorld();
+    const projected = new THREE.Vector3(point.x, point.y + .9, point.z).project(camera);
+    return projected.z >= -1 && projected.z <= 1 && Math.abs(projected.x) < 1.12 && Math.abs(projected.y) < 1.2;
+  }
+
   addTraffic(traffic: TrafficSystem): void {
     this.trafficViews = traffic.cars.map(({ spawn }) => {
       const view = new TrafficView(spawn);
@@ -163,9 +185,16 @@ export class GameView {
 
   dispose(): void {
     this.resizeObserver.disconnect();
+    this.disposeMeshes(this.scene);
+    this.scene.clear();
+    this.renderer.dispose();
+    this.renderer.domElement.remove();
+  }
+
+  private disposeMeshes(root: THREE.Object3D): void {
     const geometries = new Set<THREE.BufferGeometry>();
     const materials = new Set<THREE.Material>();
-    this.scene.traverse((object) => {
+    root.traverse((object) => {
       if (object instanceof THREE.Mesh) {
         geometries.add(object.geometry);
         for (const mat of [object.material].flat()) materials.add(mat);
@@ -173,8 +202,5 @@ export class GameView {
     });
     for (const geo of geometries) geo.dispose();
     for (const material of materials) material.dispose();
-    this.scene.clear();
-    this.renderer.dispose();
-    this.renderer.domElement.remove();
   }
 }

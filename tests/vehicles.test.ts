@@ -1,4 +1,5 @@
 import RAPIER from "@dimforge/rapier3d-compat";
+import { EventBus } from "../src/core/EventBus";
 import { beforeAll, expect, it } from "vitest";
 import { playerDefinition } from "../src/content/downtownStory";
 import { downtownTraffic } from "../src/content/vehicles/downtownTraffic";
@@ -38,7 +39,10 @@ it("boards only a nearby slow car, ejects its driver once, and parks beside a cl
   world.timestep = FIXED_DT;
   world.createCollider(RAPIER.ColliderDesc.cuboid(80, .5, 80).setTranslation(0, -.5, 0));
   const traffic = new TrafficSystem([downtownTraffic[0]]);
-  const vehicles = new VehicleSystem(world, traffic);
+  const events = new EventBus();
+  const thefts: string[] = [];
+  events.on("vehicle:stolen", ({ offenderId }) => thefts.push(offenderId));
+  const vehicles = new VehicleSystem(world, traffic, events);
   const [car] = traffic.cars;
   const start = traffic.pose(car, 1);
   const player = new EntityManager().spawn("player", playerDefinition, { x: start.x, y: .05, z: start.z + 1.9 });
@@ -50,7 +54,7 @@ it("boards only a nearby slow car, ejects its driver once, and parks beside a cl
     expect(vehicles.nearest(player.position, movement.collider)).toBeNull();
     car.speed = 0;
     expect(vehicles.nearest(player.position, movement.collider)?.car).toBe(car);
-    vehicles.enter(car, player.position);
+    vehicles.enter(car, player.position, player.id);
     movement.board();
     expect(movement.collider.isEnabled()).toBe(false);
     expect(car.offRoute).toBeDefined();
@@ -76,8 +80,9 @@ it("boards only a nearby slow car, ejects its driver once, and parks beside a cl
     for (let i = 0; i < 300; i++) step();
     expect(traffic.pose(car, 1)).toEqual(parked);
     expect(vehicles.drivers).toHaveLength(0);
-    vehicles.enter(car, exit.point);
+    vehicles.enter(car, exit.point, player.id);
     expect(vehicles.drivers).toHaveLength(0);
+    expect(thefts).toEqual([player.id]);
   } finally {
     movement.dispose();
     vehicles.dispose();

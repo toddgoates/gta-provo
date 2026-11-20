@@ -24,6 +24,10 @@ body { margin: 0; }
 .health-label { display: flex; justify-content: space-between; margin-bottom: 5px; color: #ffe1d7; font: 700 .66rem ui-monospace, monospace; letter-spacing: .10em; text-transform: uppercase; }
 .health-track { height: 8px; background: #522832; }
 .health-fill { height: 100%; background: #ea4c50; transition: width 180ms ease-out; }
+.wanted { display: flex; align-items: center; gap: 4px; margin-top: 7px; color: #ffe1d7; font: 700 .6rem ui-monospace, monospace; text-transform: uppercase; }
+.wanted span { margin-right: 3px; }
+.wanted i { width: 8px; height: 8px; border: 1px solid #bc676e; border-radius: 50%; background: #452832; }
+.wanted i.lit { border-color: #ff8981; background: #f05b60; }
 .mission { position: absolute; top: 77px; right: 26px; width: min(310px, calc(100% - 52px)); padding: 15px 17px 17px; border-top: 3px solid var(--gold); }
 .eyebrow { color: var(--gold); }
 h1, h2, p { margin: 0; }

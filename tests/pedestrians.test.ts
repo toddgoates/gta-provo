@@ -49,7 +49,7 @@ it("moves downtown groups across marked crosswalks while traffic keeps clear", (
   }
   expect(crossed).toBeGreaterThan(100);
   expect(carDrove).toBe(true);
-  expect(crowd.walkers).toHaveLength(13);
+  expect(crowd.walkers.filter(({ entity }) => entity.definition.faction !== "police")).toHaveLength(13);
   const looks = crowd.walkers.map(({ entity }) => entity.definition.appearance!);
   expect(new Set(looks.map(({ haircut }) => haircut)).size).toBeGreaterThan(1);
   for (const look of looks) expect(resolveWardrobe(look.defaultWardrobe).top.color).toBeTypeOf("number");

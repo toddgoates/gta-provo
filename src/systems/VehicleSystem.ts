@@ -1,4 +1,5 @@
 import RAPIER from "@dimforge/rapier3d-compat";
+import type { EventBus } from "../core/EventBus";
 import type { Point } from "../entities/EntityManager";
 import type { DriverProfile } from "../entities/Appearance";
 import type { Crosswalk } from "./PedestrianSystem";
@@ -43,7 +44,7 @@ export class VehicleSystem {
   exitRequested = false;
   exitBlocked = false;
 
-  constructor(private readonly world: RAPIER.World, private readonly traffic: TrafficSystem) {
+  constructor(private readonly world: RAPIER.World, private readonly traffic: TrafficSystem, private readonly events?: EventBus) {
     for (const car of traffic.cars) {
       const { x, z, yaw } = traffic.pose(car, 1);
       const { width, height, length } = car.spawn.model;
@@ -81,7 +82,7 @@ export class VehicleSystem {
     return result;
   }
 
-  enter(car: TrafficCar, player: Point): void {
+  enter(car: TrafficCar, player: Point, driverId?: string): void {
     if (this.seated) return;
     if (!car.offRoute) {
       const { x, z, yaw } = this.traffic.pose(car, 1);
@@ -93,6 +94,9 @@ export class VehicleSystem {
         position: { x: x + dx * offset, y: .55, z: z + dz * offset },
         yaw: Math.atan2(-dx, -dz), tumble: .35, running: false, age: 0, dx, dz });
       this.traffic.detach(car);
+      if (driverId) this.events?.emit("vehicle:stolen", {
+        id: `theft-${car.spawn.id}`, offenderId: driverId, victimId: car.spawn.id, position: { ...player },
+      });
     }
     this.seated = car;
     this.exitBlocked = false;

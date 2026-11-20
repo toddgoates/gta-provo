@@ -1,4 +1,5 @@
 import type { Entity, Point } from "../entities/EntityManager";
+import type { CrimeIncident } from "../core/EventBus";
 
 export const meleeMoves = [
   { duration: .39, impact: .17, reach: 1.36, damage: 9 },
@@ -27,6 +28,7 @@ const distance = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.z - a.z);
 const direction = (a: Point, b: Point) => Math.atan2(a.x - b.x, a.z - b.z);
 const onSidewalk = ({ x, z }: Point) => Math.abs(x) > 9.2 && Math.abs(z) > 9.2;
 type ClearPath = (from: Point, to: Point) => boolean;
+export interface OfficerOrder { destination: Point; attack: boolean }
 
 export class MeleeSystem {
   private swing?: Swing;
@@ -35,18 +37,21 @@ export class MeleeSystem {
   private nextMove = 0;
   private flinch = 0;
   private fighters = new Map<string, Fighter>();
+  private impactId = 0;
 
   constructor(
     private readonly player: Entity,
-    private readonly pedestrians: readonly Entity[],
+    private readonly pedestrians: readonly Entity[] | (() => readonly Entity[]),
     private readonly clearPath: ClearPath,
     private readonly random: () => number = Math.random,
+    private readonly reportHit: (hit: CrimeIncident & { knockedOut: boolean }) => void = () => {},
   ) {}
 
   get attacking(): boolean { return !!this.swing; }
   hasReactor(id: string): boolean { return this.fighters.has(id); }
   reactionSpeed(id: string): number { return this.fighters.get(id)?.speed ?? 0; }
   healthOf(id: string): number { return this.fighters.get(id)?.health ?? MAX_PEDESTRIAN_HEALTH; }
+  forget(id: string): void { this.fighters.delete(id); }
 
   fallProgress(id: string): number | undefined {
     const fighter = this.fighters.get(id);
@@ -65,7 +70,9 @@ export class MeleeSystem {
 
   playerHit(): void { this.flinch = .28; }
 
-  step(dt: number, pressed: boolean, canFight: boolean, canTarget: (id: string) => boolean = () => true): number {
+  step(dt: number, pressed: boolean, canFight: boolean, canTarget: (id: string) => boolean = () => true,
+    orders: ReadonlyMap<string, OfficerOrder> = new Map()): number {
+    const pedestrians = typeof this.pedestrians === "function" ? this.pedestrians() : this.pedestrians;
     this.flinch = Math.max(0, this.flinch - dt);
     if (!canFight) { this.swing = undefined; this.queued = 0; this.queuedFor = 0; }
     if (pressed && canFight) {
@@ -77,7 +84,7 @@ export class MeleeSystem {
       const swing = this.swing;
       const move = meleeMoves[swing.move];
       if (this.advanceSwing(swing, dt)) {
-        const target = this.pedestrians.filter((npc) =>
+        const target = pedestrians.filter((npc) =>
           this.healthOf(npc.id) > 0 && canTarget(npc.id) && this.inReach(this.player, npc, swing.move))
           .sort((a, b) => distance(this.player.position, a.position) - distance(this.player.position, b.position))[0];
         if (target) this.hit(target, move.damage);
@@ -93,8 +100,13 @@ export class MeleeSystem {
     } else this.queuedFor = Math.max(0, this.queuedFor - dt);
 
     let damage = 0;
-    for (const npc of this.pedestrians) {
-      const fighter = this.fighters.get(npc.id);
+    for (const npc of pedestrians) {
+      const order = orders.get(npc.id);
+      let fighter = this.fighters.get(npc.id);
+      if (order && !fighter) {
+        fighter = this.makeFighter("fight");
+        this.fighters.set(npc.id, fighter);
+      }
       if (!fighter) continue;
       fighter.speed = 0;
       if (fighter.health === 0) {
@@ -105,6 +117,17 @@ export class MeleeSystem {
       fighter.cooldown = Math.max(0, fighter.cooldown - dt);
       fighter.time = Math.max(0, fighter.time - dt);
       if (fighter.stun > 0) continue;
+      if (npc.definition.faction === "police" && !order) {
+        fighter.swing = undefined;
+        continue;
+      }
+      if (order && (!order.attack || !canFight || (!fighter.swing && distance(npc.position, this.player.position) > 1.35))) {
+        fighter.swing = undefined;
+        if (distance(npc.position, order.destination) > .55) {
+          fighter.speed = this.move(npc, direction(npc.position, order.destination), order.attack ? 4.9 : 3.5, dt, true);
+        }
+        continue;
+      }
       if (fighter.response === "fight" && canFight) {
         if (fighter.swing) {
           if (this.advanceSwing(fighter.swing, dt) && this.inReach(npc, this.player, fighter.swing.move)) {
@@ -156,13 +179,14 @@ export class MeleeSystem {
   private hit(target: Entity, damage: number): void {
     let fighter = this.fighters.get(target.id);
     if (!fighter) {
-      const response = this.random() < .5 ? "flee" : "fight";
-      fighter = { health: MAX_PEDESTRIAN_HEALTH, fallElapsed: 0, response, time: 0,
-        stun: 0, cooldown: .6, nextMove: 0, speed: 0 };
+      const response = target.definition.faction !== "police" && this.random() < .5 ? "flee" : "fight";
+      fighter = this.makeFighter(response);
       this.fighters.set(target.id, fighter);
     }
     fighter.health = Math.max(0, fighter.health - damage);
     fighter.swing = undefined;
+    this.reportHit({ id: `strike-${++this.impactId}`, offenderId: this.player.id, victimId: target.id,
+      position: target.position, knockedOut: fighter.health === 0 });
     if (fighter.health > 0) {
       fighter.stun = .3;
       if (fighter.response === "flee") fighter.time = 4;
@@ -181,11 +205,16 @@ export class MeleeSystem {
     }
   }
 
-  private move(entity: Entity, yaw: number, speed: number, dt: number): number {
+  private makeFighter(response: Fighter["response"]): Fighter {
+    return { health: MAX_PEDESTRIAN_HEALTH, fallElapsed: 0, response, time: 0,
+      stun: 0, cooldown: .6, nextMove: 0, speed: 0 };
+  }
+
+  private move(entity: Entity, yaw: number, speed: number, dt: number, crossRoad = false): number {
     const from = entity.position;
     const ahead = (step: number): Point => ({ x: from.x - Math.sin(yaw) * step, y: from.y, z: from.z - Math.cos(yaw) * step });
     const to = ahead(speed * dt);
-    if ((onSidewalk(from) && !onSidewalk(to)) || !this.clearPath(from, ahead(Math.max(.45, speed * dt)))) return 0;
+    if ((onSidewalk(from) && !onSidewalk(to) && !crossRoad) || !this.clearPath(from, ahead(Math.max(.45, speed * dt)))) return 0;
     to.y = onSidewalk(to) ? .15 : -.01;
     entity.position = to;
     entity.yaw = yaw;

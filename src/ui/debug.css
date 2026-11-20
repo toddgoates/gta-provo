@@ -1,10 +1,12 @@
 .debug {
   position: absolute;
   left: 26px;
-  top: 130px;
+  top: 175px;
   max-width: min(340px, 80vw);
   padding: 11px;
   font: 700 .72rem/1.6 ui-monospace, monospace;
   letter-spacing: .02em;
 }
 .debug b { color: var(--gold); }
+.debug-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.debug-actions button { background: #413c48; border: 1px solid #85745e; padding: 2px 6px; }

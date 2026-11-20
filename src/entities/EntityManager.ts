@@ -1,3 +1,5 @@
+import type { CharacterAppearance, Wardrobe } from "./Appearance";
+
 export type Point = { x: number; y: number; z: number };
 export type EntityKind = "player" | "npc" | "vehicle" | "interactable" | "environment";
 export type Interaction = { range: number; prompt: string }
@@ -9,6 +11,7 @@ export interface EntityDefinition {
   kind: EntityKind;
   modelId: string;
   appearance?: CharacterAppearance;
+  faction?: "police" | "civilian";
   interaction?: Interaction;
 }
 
@@ -36,7 +39,7 @@ export class EntityManager {
   }
 
   get(id: string): Entity | undefined { return this.entities.get(id); }
+  remove(id: string): void { this.entities.delete(id); }
   all(): Iterable<Entity> { return this.entities.values(); }
   clear(): void { this.entities.clear(); }
 }
-import type { CharacterAppearance, Wardrobe } from "./Appearance";
