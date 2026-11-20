@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import type { Entity, Point } from "../entities/EntityManager";
 import { CameraRig } from "./CameraRig";
+import { TrafficView } from "./TrafficView";
+import type { TrafficSystem } from "../systems/TrafficSystem";
 
 function buildPerson(modelId: string) {
   const group = new THREE.Group();
@@ -51,6 +53,7 @@ export class GameView {
   readonly scene = new THREE.Scene();
   readonly rig = new CameraRig();
   private actors = new Map<string, ReturnType<typeof buildPerson>>();
+  private trafficViews: TrafficView[] = [];
   private marker = new THREE.Group();
   private crystal: THREE.Mesh;
   private shadow = new THREE.Mesh(new THREE.CircleGeometry(.49, 12),
@@ -99,6 +102,20 @@ export class GameView {
     actor.group.rotation.y = entity.yaw;
     this.actors.set(entity.id, actor);
     this.scene.add(actor.group);
+  }
+
+  addTraffic(traffic: TrafficSystem): void {
+    this.trafficViews = traffic.cars.map(({ spawn }) => {
+      const view = new TrafficView(spawn);
+      this.scene.add(view.root);
+      return view;
+    });
+  }
+
+  updateTraffic(traffic: TrafficSystem, alpha: number): void {
+    traffic.cars.forEach((car, index) => {
+      this.trafficViews[index].update(traffic.pose(car, alpha), car.travelled, car.braking);
+    });
   }
 
   render(player: Entity, position: Point, speed: number, goal: Point | undefined, dt: number): void {

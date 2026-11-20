@@ -15,10 +15,10 @@ A third-person neighborhood sandbox in a compressed, fictional Utah Valley. Take
 
 Start at Center & University near the Soda Dept. Talk to Marla Jensen, choose a reply, and confirm the committee’s folding chair at the Welcome Pavilion by reaching the marker. Marla pays $15. The neighborhood stays open to explore; nothing else unlocks in this build.
 
-The playable grid is three built blocks plus a public plaza. One static NPC, a few text lines, and one walking route are sufficient to validate the loop.
+The playable grid is three built blocks plus a public plaza. One static NPC, a few text lines, and one walking route are sufficient to validate the loop. Light NPC traffic makes crossing University Avenue feel like crossing a street: compact cars, sedans, and pickups follow their lanes and take turns at the four-way stop.
 
 ## Deferred
 
-Broader districts and neighborhood streaming, interiors, pedestrians and traffic, drivable cars and vehicle damage, optional activities, a campaign, local saves, GLB art, voice acting, radio/music and ambience, day/night, and multi-step cutscenes. No external generation APIs are required to run the game.
+Broader districts and neighborhood streaming, interiors, roaming pedestrians, turning between streets and larger traffic networks, drivable cars and vehicle damage, optional activities, a campaign, local saves, GLB art, voice acting, radio/music and ambience, day/night, and multi-step cutscenes. No external generation APIs are required to run the game.
 
 **Next milestone:** Add one parked compact with arcade handling, enter/exit interactions, and a driving camera. Use the existing streets to validate the on-foot/driving transition before growing the map or adding missions.

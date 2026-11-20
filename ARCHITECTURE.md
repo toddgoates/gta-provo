@@ -42,7 +42,7 @@ Each future chunk can use the same district-style boundary: authored footprints/
 ## Extension points and lifecycle
 
 - `SceneSequence` currently describes mode and subject focus. Extend this data for scripted actions only as cutscene needs appear.
-- `VehicleDefinition` and driving policy/events are contracts, not a working vehicle system. A future driving controller can take over input and camera through the director; enter/exit should publish typed events.
+- `TrafficSystem` runs NPC traffic on the fixed tick independently of rendering and physics. `downtownTraffic.ts` authors lanes, spawns and vehicle appearances. Cars follow two closed lane loops and reserve one shared junction in arrival order. Game syncs their kinematic Rapier colliders; the view interpolates along the route. Player-driving contracts are separate; a future controller can take over input and camera through the director and emit enter/exit events.
 - `SaveDataV1` and `SaveRepository` define the future IndexedDB boundary. Mission state supports snapshot/restore in memory; no slot management, serialization, or restoration of full sessions is wired.
 - `GameAudio` is an interface only. Start with local asset playback when the first audio arrives.
 - React unmount aborts pending initialization and disposes a running game. Teardown stops RAF, removes browser/event subscriptions, removes physics objects, frees the Rapier world, and disposes the window view’s Three.js resources.

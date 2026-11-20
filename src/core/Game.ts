@@ -1,5 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { downtown } from "../content/downtown";
+import { downtownTraffic } from "../content/vehicles/downtownTraffic";
 import { dialogueCamera, firstShift, marlaDefinition, marlaDialogue, playerDefinition } from "../content/downtownStory";
 import { EntityManager } from "../entities/EntityManager";
 import type { Entity, Point } from "../entities/EntityManager";
@@ -10,6 +11,7 @@ import { MissionSystem } from "../systems/MissionSystem";
 import { MovementSystem } from "../systems/MovementSystem";
 import { SequenceDirector } from "../systems/SequenceDirector";
 import { TriggerSystem } from "../systems/TriggerSystem";
+import { TrafficSystem } from "../systems/TrafficSystem";
 import type { HudSnapshot } from "../ui/hudStore";
 import { WorldManager } from "../world/WorldManager";
 import { EventBus } from "./EventBus";
@@ -29,6 +31,8 @@ export class Game {
   private triggers = new TriggerSystem(this.events, downtown.locations);
   private interaction = new InteractionSystem(this.events);
   private sequences = new SequenceDirector(this.director);
+  private traffic = new TrafficSystem(downtownTraffic);
+  private trafficBodies: RAPIER.RigidBody[];
   private player = this.entities.spawn("player", playerDefinition, downtown.spawns.player, .23);
   private npc = this.entities.spawn("marla-downtown", marlaDefinition, downtown.spawns.npc, Math.PI + .42);
   private view: GameView;
@@ -59,6 +63,16 @@ export class Game {
     this.movement = new MovementSystem(this.physics, this.player);
     this.view.addActor(this.player);
     this.view.addActor(this.npc);
+    this.view.addTraffic(this.traffic);
+    this.trafficBodies = this.traffic.cars.map((car) => {
+      const { x, z, yaw } = this.traffic.pose(car, 1);
+      const { width, height, length } = car.spawn.model;
+      const body = this.physics.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased()
+        .setTranslation(x, 0, z).setRotation(this.yawRotation(yaw)));
+      this.physics.createCollider(RAPIER.ColliderDesc.cuboid(width / 2, height / 2, length / 2)
+        .setTranslation(0, height / 2, 0), body);
+      return body;
+    });
 
     this.input = new InputManager(this.view.renderer.domElement,
       () => this.director.policy.walk || this.director.policy.drive,
@@ -115,6 +129,7 @@ export class Game {
     this.mission.dispose();
     this.events.clear();
     this.movement.dispose();
+    for (const body of this.trafficBodies) this.physics.removeRigidBody(body);
     this.district.dispose();
     this.physics.free();
     this.view.dispose();
@@ -133,6 +148,13 @@ export class Game {
         heading: this.view.rig.heading,
       });
     }
+    this.traffic.step(dt, this.player.position);
+    this.traffic.cars.forEach((car, index) => {
+      const { x, z, yaw } = this.traffic.pose(car, 1);
+      const body = this.trafficBodies[index];
+      body.setNextKinematicTranslation({ x, y: 0, z });
+      body.setNextKinematicRotation(this.yawRotation(yaw));
+    });
     this.physics.step();
     if (policy.walk) this.movement.commit(dt);
     this.triggers.update(this.player.position);
@@ -154,11 +176,16 @@ export class Game {
       const focus = focusId ? this.entities.get(focusId)?.position : undefined;
       this.view.rig.update(dt, interpolated, focus, this.castCameraRay);
     }
+    this.view.updateTraffic(this.traffic, alpha);
     this.view.render(this.player, interpolated, walk ? this.movement.speed : 0, this.goal, camera === "hold" ? 0 : dt);
     if (import.meta.env.DEV && dt > 0) this.fps += (1 / dt - this.fps) * .09;
     this.hudElapsed += dt;
     if (this.hudElapsed >= .1) this.publishHud();
   };
+
+  private yawRotation(yaw: number): RAPIER.Rotation {
+    return { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) };
+  }
 
   private castCameraRay = (origin: Point, direction: Point, distance: number): number | undefined => {
     const hit = this.physics.castRay(new RAPIER.Ray(origin, direction), distance, true,

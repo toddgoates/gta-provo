@@ -69,10 +69,10 @@ export class WorldManager {
 
   private streetMarkings(width: number, depth: number, roadWidth: number): void {
     const half = roadWidth / 2;
-    for (let x = -width / 2 + 3; x < width / 2; x += 5) {
+    for (let x = -width / 2 + 12; x < width / 2 - 10; x += 5) {
       if (Math.abs(x) > half + 6) this.box(x, .005, 0, 2.6, .012, .14, 0xf3cb77);
     }
-    for (let z = -depth / 2 + 3; z < depth / 2; z += 5) {
+    for (let z = -depth / 2 + 12; z < depth / 2 - 10; z += 5) {
       if (Math.abs(z) > half + 6) this.box(0, .005, z, .14, .012, 2.6, 0xf3cb77);
     }
     for (let n = -7; n <= 7; n += 2) {
@@ -81,6 +81,46 @@ export class WorldManager {
         this.box(side * (half + 2), .006, n, 2.3, .012, .75, 0xf1e0ca);
       }
     }
+    const line = half + 4;
+    const curb = half + .85;
+    for (const side of [-1, 1]) {
+      this.box(-side * half / 2, .012, -side * line, half - .5, .014, .24, 0xf1e0ca);
+      this.box(-side * line, .012, side * half / 2, .24, .014, half - .5, 0xf1e0ca);
+      this.stopSign(-side * curb, -side * (line + .7), side === 1 ? Math.PI : 0);
+      this.stopSign(-side * (line + .7), side * curb, -side * Math.PI / 2);
+    }
+  }
+
+  private stopSign(x: number, z: number, yaw: number): void {
+    this.box(x, 1.29, z, .065, 2.28, .065, 0x74787d);
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 128;
+    const ctx = canvas.getContext("2d")!;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const angle = (i + .5) * Math.PI / 4;
+      ctx.lineTo(64 + Math.cos(angle) * 63, 64 + Math.sin(angle) * 63);
+    }
+    ctx.closePath();
+    ctx.fillStyle = "#a84440";
+    ctx.fill();
+    ctx.strokeStyle = "#fff2d7";
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.fillStyle = "#fff2d7";
+    ctx.font = "bold 35px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("STOP", 64, 76);
+    const map = new THREE.CanvasTexture(canvas);
+    map.colorSpace = THREE.SRGBColorSpace;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(.8, .8),
+      new THREE.MeshBasicMaterial({ map, transparent: true, alphaTest: .3 }));
+    mesh.position.set(x + Math.sin(yaw) * .04, 2.37, z + Math.cos(yaw) * .04);
+    mesh.rotation.y = yaw;
+    const back = new THREE.Mesh(new THREE.CircleGeometry(.391, 8, Math.PI / 8), this.mat(0x84888b));
+    back.position.set(x - Math.sin(yaw) * .04, 2.37, z - Math.cos(yaw) * .04);
+    back.rotation.y = yaw + Math.PI;
+    this.root.add(mesh, back);
   }
 
   private building({ x, z, width: w, depth: d, height: h, color, front, sign, accent = 0x6a5a60 }: BuildingLot): void {
