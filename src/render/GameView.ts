@@ -5,6 +5,7 @@ import { TrafficView } from "./TrafficView";
 import type { TrafficSystem } from "../systems/TrafficSystem";
 import { buildCharacter } from "./CharacterView";
 import type { FleeingDriver } from "../systems/VehicleSystem";
+import type { Pedestrian } from "../systems/PedestrianSystem";
 
 export class GameView {
   readonly renderer: THREE.WebGLRenderer;
@@ -94,6 +95,17 @@ export class GameView {
       view.group.rotation.set(-driver.tumble, driver.yaw, 0, "YXZ");
       const stride = driver.running ? Math.sin(this.time * 15) * .78 : .45;
       this.animateStride(view, stride);
+    }
+  }
+
+  updatePedestrians(walkers: readonly Pedestrian[], alpha: number): void {
+    for (const { entity, previous, phase, speed } of walkers) {
+      const view = this.actors.get(entity.id)!.view;
+      const { x, y, z } = entity.position;
+      view.group.position.set(previous.x + (x - previous.x) * alpha, previous.y + (y - previous.y) * alpha,
+        previous.z + (z - previous.z) * alpha);
+      view.group.rotation.y = entity.yaw;
+      this.animateStride(view, Math.sin(this.time * (speed > 2 ? 9 : 7) + phase) * Math.min(.43, speed * .175));
     }
   }
 

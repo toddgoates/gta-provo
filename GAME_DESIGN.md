@@ -19,6 +19,6 @@ The playable grid is three built blocks plus a public plaza. One static NPC, a f
 
 ## Deferred
 
-Broader districts and neighborhood streaming, interiors, roaming pedestrians, turning between streets and larger traffic networks, vehicle damage and crash reactions, optional activities, a campaign, local saves, GLB art, voice acting, radio/music and ambience, day/night, and multi-step cutscenes. No external generation APIs are required to run the game.
+Broader districts and neighborhood streaming, interiors, freeform pedestrian navigation, turning between streets and larger traffic networks, vehicle damage and crash reactions, optional activities, a campaign, local saves, GLB art, voice acting, radio/music and ambience, day/night, and multi-step cutscenes. No external generation APIs are required to run the game.
 
 **Next milestone:** Tune arcade handling and build a short driving objective on the existing streets before growing the map.

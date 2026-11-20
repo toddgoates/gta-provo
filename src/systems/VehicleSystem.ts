@@ -1,6 +1,7 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { Point } from "../entities/EntityManager";
 import type { DriverProfile } from "../entities/Appearance";
+import type { Crosswalk } from "./PedestrianSystem";
 import type { TrafficCar, TrafficSystem } from "./TrafficSystem";
 import { MIN_TRAFFIC_IMPACT_SPEED } from "./HealthSystem";
 
@@ -126,9 +127,9 @@ export class VehicleSystem {
     return null;
   }
 
-  step(dt: number, input: DriveInput, pedestrian?: Point): void {
+  step(dt: number, input: DriveInput, pedestrian?: Point, crosswalks?: readonly Crosswalk[]): void {
     if (this.seated) this.drive(this.seated, dt, this.exitRequested ? { throttle: 0, steer: 0, brake: true } : input);
-    this.traffic.step(dt, pedestrian);
+    this.traffic.step(dt, pedestrian, crosswalks);
     for (const [car, { body }] of this.bodies) {
       const { x, z, yaw } = this.traffic.pose(car, 1);
       body.setNextKinematicTranslation({ x, y: 0, z });

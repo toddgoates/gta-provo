@@ -40,6 +40,7 @@ To take a car, approach it while it's stopped or crawling and press **E** when p
 - Three developed blocks and a public plaza with storefronts, crosswalks, trees, and a Wasatch-inspired skyline.
 - Fixed-step Rapier capsule movement with gravity, curb stepping, jumping, and building collision; a follow camera with wall obstruction.
 - Six low-poly NPC cars in three body styles. They keep right, brake behind other cars, take turns at the four-way stop, and yield to the player.
+- Thirteen pedestrians in a mix of solo walkers, pairs, and small groups. Some stand and chat; walkers stay on sidewalks and use marked crosswalks when traffic clears.
 - Take over a slow or stopped car, watch one of six distinct drivers tumble out and flee, and drive with an arcade chase camera.
 - One NPC, one branching text conversation, and one event-driven mission with a destination marker and a $15 reward.
 - A blond, blue-eyed player in a light gray tee and blue jeans. Clothing is defined in swappable slots; there is no wardrobe menu yet.

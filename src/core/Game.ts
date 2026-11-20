@@ -1,5 +1,7 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { downtown } from "../content/downtown";
+import { downtownPedestrians } from "../content/pedestrians";
+import { createPedestrianLook } from "../content/characters/pedestrianLooks";
 import { downtownTraffic } from "../content/vehicles/downtownTraffic";
 import { dialogueCamera, firstShift, marlaDefinition, marlaDialogue, playerDefinition } from "../content/downtownStory";
 import { EntityManager } from "../entities/EntityManager";
@@ -14,6 +16,7 @@ import { MovementSystem } from "../systems/MovementSystem";
 import { SequenceDirector } from "../systems/SequenceDirector";
 import { TriggerSystem } from "../systems/TriggerSystem";
 import { TrafficSystem } from "../systems/TrafficSystem";
+import { PedestrianSystem } from "../systems/PedestrianSystem";
 import type { TrafficCar } from "../systems/TrafficSystem";
 import { VehicleSystem } from "../systems/VehicleSystem";
 import { equipGarment } from "../systems/WardrobeSystem";
@@ -41,6 +44,7 @@ export class Game {
   private vehicles: VehicleSystem;
   private player = this.entities.spawn("player", playerDefinition, downtown.spawns.player, .23);
   private npc = this.entities.spawn("marla-downtown", marlaDefinition, downtown.spawns.npc, Math.PI + .42);
+  private pedestrians = new PedestrianSystem(this.entities, downtownPedestrians, createPedestrianLook);
   private view: GameView;
   private physics: RAPIER.World;
   private district: WorldManager;
@@ -70,6 +74,7 @@ export class Game {
     this.movement = new MovementSystem(this.physics, this.player);
     this.view.addActor(this.player);
     this.view.addActor(this.npc);
+    for (const { entity } of this.pedestrians.walkers) this.view.addActor(entity);
     this.view.addTraffic(this.traffic);
     this.vehicles = new VehicleSystem(this.physics, this.traffic);
 
@@ -156,11 +161,14 @@ export class Game {
     }
     const use = this.input.take("KeyE");
     if (policy.drive && use) this.vehicles.exitRequested = true;
+    const crossings = this.pedestrians.step(dt, this.traffic.cars.map((car) => ({
+      ...this.traffic.pose(car, 1), speed: car.speed, length: car.spawn.model.length, width: car.spawn.model.width,
+    })));
     this.vehicles.step(dt, {
       throttle: Number(this.input.down("KeyW")) - Number(this.input.down("KeyS")),
       steer: Number(this.input.down("KeyA")) - Number(this.input.down("KeyD")),
       brake: this.input.down("Space"),
-    }, policy.walk ? this.player.position : undefined);
+    }, policy.walk ? this.player.position : undefined, crossings);
     const impact = walkDelta && this.health.canTakeDamage
       ? this.vehicles.pedestrianImpact(this.movement.collider, walkDelta, dt) : 0;
     this.physics.step();
@@ -225,6 +233,7 @@ export class Game {
       this.view.rig.update(dt, vehiclePose ? { ...vehiclePose, y: 0 } : interpolated, focus, this.castCameraRay, vehiclePose?.yaw);
     }
     this.view.updateTraffic(this.traffic, alpha);
+    this.view.updatePedestrians(this.pedestrians.walkers, alpha);
     this.view.updateDrivers(this.vehicles.drivers);
     this.view.render(this.player, interpolated, walk ? this.movement.speed : 0, this.goal, camera === "hold" ? 0 : dt, !!occupied);
     if (import.meta.env.DEV && dt > 0) this.fps += (1 / dt - this.fps) * .09;

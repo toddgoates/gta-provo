@@ -1,6 +1,7 @@
 import type { Point } from "../entities/EntityManager";
 import type { DriverProfile } from "../entities/Appearance";
 import type { RoadLoop, RoadPose } from "./TrafficRoute";
+import type { Crosswalk } from "./PedestrianSystem";
 import { forwardGap, loopLength, roadPose, stopDistances } from "./TrafficRoute";
 
 export interface TrafficModel {
@@ -60,7 +61,7 @@ export class TrafficSystem {
     if (this.crossing === car) this.crossing = undefined;
   }
 
-  step(dt: number, pedestrian?: Point): void {
+  step(dt: number, pedestrian?: Point, crosswalks: readonly Crosswalk[] = []): void {
     this.time += dt;
     if (!this.crossing) {
       const next = this.cars.filter((car) => !car.offRoute && car.waiting >= STOP_TIME)
@@ -73,7 +74,7 @@ export class TrafficSystem {
       }
     }
     // Compute every driver's decision from the same starting poses.
-    const plans = this.cars.map((car) => car.offRoute ? null : this.plan(car, pedestrian, dt));
+    const plans = this.cars.map((car) => car.offRoute ? null : this.plan(car, pedestrian, dt, crosswalks));
     this.cars.forEach((car, index) => {
       const plan = plans[index];
       if (!plan) return;
@@ -104,7 +105,7 @@ export class TrafficSystem {
     return roadPose(car.spawn.road, car.previous + forwardGap(car.previous, car.distance, length) * alpha);
   }
 
-  private plan(car: TrafficCar, pedestrian: Point | undefined, dt: number) {
+  private plan(car: TrafficCar, pedestrian: Point | undefined, dt: number, crosswalks: readonly Crosswalk[]) {
     const { road, model } = car.spawn;
     const length = loopLength(road);
     let hardDistance = Infinity;
@@ -118,6 +119,16 @@ export class TrafficSystem {
     if (this.crossing !== car) limitForStop(toLine);
 
     const { turning } = roadPose(road, car.distance);
+    for (const { from, to } of crosswalks) {
+      const acrossX = Math.abs(to.x - from.x) > Math.abs(to.z - from.z);
+      if (acrossX !== (road.axis === "z")) continue;
+      const band = acrossX ? from.z : from.x;
+      const forward = road.end + band;
+      const backward = 3 * road.end + Math.PI * road.lane - band;
+      const gap = Math.min(forwardGap(car.distance, forward, length), forwardGap(car.distance, backward, length));
+      // Stop the bumper short of the marked strip even when already beyond the stop line.
+      if (gap < 35) limitForStop(Math.max(0, gap - model.length / 2 - 1.8));
+    }
     if (turning) target = Math.min(target, TURN_SPEED);
     else {
       const toTurn = Math.min(forwardGap(car.distance, 2 * road.end, length),
