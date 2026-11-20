@@ -1,0 +1,61 @@
+:root {
+  color-scheme: dark;
+  font: 16px system-ui, -apple-system, sans-serif;
+  color: #fff7e7;
+  background: #222938;
+  --gold: #ffd078;
+  --paper: #fff4de;
+  --panel: #222530ed;
+  --line: #e9d7b746;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.app, .world, .hud, .loading { position: absolute; inset: 0; overflow: hidden; }
+.world canvas { display: block; width: 100%; height: 100%; }
+.hud { pointer-events: none; }
+.panel { background: var(--panel); border: 1px solid var(--line); box-shadow: 0 5px 18px #191d2d38; }
+.masthead { position: absolute; top: 22px; left: 28px; color: var(--paper); text-shadow: 2px 3px #36324291, 0 0 22px #3733407a; }
+.brand { font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif; font-weight: 900; font-size: clamp(3rem, 6.5vw, 5.4rem); letter-spacing: -.055em; line-height: .95; }
+.brand span { color: var(--gold); }
+.edition, .eyebrow, .map-title, .map-caption, kbd { font: 700 .72rem ui-monospace, monospace; text-transform: uppercase; letter-spacing: .14em; }
+.edition { margin-top: 9px; }
+.edition i { display: inline-block; width: 4px; height: 4px; vertical-align: 3px; background: var(--gold); margin: 0 4px; }
+.mission { position: absolute; top: 77px; right: 26px; width: min(310px, calc(100% - 52px)); padding: 15px 17px 17px; border-top: 3px solid var(--gold); }
+.eyebrow { color: var(--gold); }
+h1, h2, p { margin: 0; }
+h1 { font-size: 1.25rem; letter-spacing: -.025em; margin: 5px 0; }
+.mission p { color: #e7dac8; font-size: .87rem; line-height: 1.4; }
+.complete { border-top-color: #b7dc9d; }
+.complete .eyebrow { color: #b7dc9d; }
+button { font: inherit; font-weight: 700; color: var(--paper); cursor: pointer; pointer-events: auto; }
+button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.pause-toggle { position: absolute; right: 26px; top: 22px; width: 39px; height: 35px; background: var(--panel); border: 1px solid var(--line); }
+.pause-toggle:hover { color: var(--gold); }
+.district-map { position: absolute; left: 25px; bottom: 25px; width: 167px; padding: 8px; }
+.map-title, .map-caption { font-size: .59rem; color: #e7d7ba; }
+.map-title { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.map-caption { margin-top: 6px; text-align: center; }
+.district-map svg { display: block; width: 100%; border: 1px solid var(--line); }
+.controls { position: absolute; bottom: 25px; right: 26px; padding: 8px 10px; color: #eadcca; display: flex; flex-wrap: wrap; gap: 7px 10px; font-size: .72rem; }
+kbd { display: inline-block; background: #494552; border: 1px solid var(--line); border-radius: 3px; padding: 2px 4px; letter-spacing: .04em; color: var(--paper); }
+.interaction { position: absolute; left: 50%; bottom: 21%; transform: translateX(-50%); padding: 8px 13px; font-size: .87rem; font-weight: 700; white-space: nowrap; }
+.interaction kbd { background: var(--gold); color: #29252b; margin-right: 5px; }
+.dialogue, .pause { padding: 22px; border-top: 3px solid var(--gold); pointer-events: auto; }
+.dialogue { position: absolute; left: 50%; bottom: 7%; transform: translateX(-50%); width: min(570px, calc(100% - 32px)); }
+.dialogue h2, .pause h2 { margin: 6px 0; letter-spacing: -.035em; }
+.dialogue p, .pause p { line-height: 1.55; color: #ede0ce; }
+.choices { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 15px; }
+.choices button, .pause button { padding: 8px 12px; background: #413c48; border: 1px solid #85745e; font-size: .88rem; }
+.choices button:hover, .pause button:hover { background: #5d514c; }
+.choices span, .pause span { color: var(--gold); margin-left: 4px; }
+.veil { position: absolute; inset: 0; display: grid; place-items: center; background: #16172297; pointer-events: auto; }
+.pause { width: min(340px, calc(100% - 32px)); }
+.pause button { margin-top: 14px; }
+.loading { display: grid; place-content: center; gap: 14px; text-align: center; padding: 20px; }
+@media (max-width: 620px) {
+  .masthead { top: 16px; left: 16px; }
+  .mission { right: 16px; top: 78px; width: min(290px, calc(100% - 32px)); }
+  .pause-toggle { top: 16px; right: 16px; }
+  .district-map { bottom: 16px; left: 16px; width: 123px; }
+  .controls { bottom: 16px; right: 16px; max-width: calc(100% - 162px); }
+}
