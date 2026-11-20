@@ -5,6 +5,7 @@ import type { DialogueSystem } from "../systems/DialogueSystem";
 
 export interface HudSnapshot {
   mode: GameMode;
+  health: number;
   mission: { title: string; objective: string } | null;
   dialogue: DialogueSystem["view"];
   prompt: string | null;

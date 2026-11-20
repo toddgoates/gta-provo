@@ -20,6 +20,10 @@ body { margin: 0; }
 .edition, .eyebrow, .map-title, .map-caption, kbd { font: 700 .72rem ui-monospace, monospace; text-transform: uppercase; letter-spacing: .14em; }
 .edition { margin-top: 9px; }
 .edition i { display: inline-block; width: 4px; height: 4px; vertical-align: 3px; background: var(--gold); margin: 0 4px; }
+.health { margin-top: 12px; padding: 6px 8px 8px; width: clamp(118px, 15vw, 174px); }
+.health-label { display: flex; justify-content: space-between; margin-bottom: 5px; color: #ffe1d7; font: 700 .66rem ui-monospace, monospace; letter-spacing: .10em; text-transform: uppercase; }
+.health-track { height: 8px; background: #522832; }
+.health-fill { height: 100%; background: #ea4c50; transition: width 180ms ease-out; }
 .mission { position: absolute; top: 77px; right: 26px; width: min(310px, calc(100% - 52px)); padding: 15px 17px 17px; border-top: 3px solid var(--gold); }
 .eyebrow { color: var(--gold); }
 h1, h2, p { margin: 0; }
@@ -52,6 +56,14 @@ kbd { display: inline-block; background: #494552; border: 1px solid var(--line);
 .veil { position: absolute; inset: 0; display: grid; place-items: center; background: #16172297; pointer-events: auto; }
 .pause { width: min(340px, calc(100% - 32px)); }
 .pause button { margin-top: 14px; }
+.death-veil { z-index: 1; background: radial-gradient(ellipse at center, #4d2328b8, #140f18ee); text-align: center; }
+.death-screen { padding: 20px; }
+.death-screen .eyebrow { color: #ffd078; }
+.death-screen h2 { margin: 12px 0 26px; color: #fff0dc; font: 900 clamp(2.6rem, 10vw, 8rem)/.92 Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif; letter-spacing: -.035em; text-transform: uppercase; text-shadow: 4px 6px #1c1420; }
+.death-screen h2 span { display: block; color: #ff6460; }
+.death-screen button { padding: 12px 24px; background: #312431; border: 1px solid var(--gold); }
+.death-screen button:hover { background: #53333b; }
+.death-screen button span { margin-left: .5em; color: var(--gold); }
 .loading { display: grid; place-content: center; gap: 14px; text-align: center; padding: 20px; }
 @media (max-width: 620px) {
   .masthead { top: 16px; left: 16px; }
@@ -59,4 +71,10 @@ kbd { display: inline-block; background: #494552; border: 1px solid var(--line);
   .pause-toggle { top: 16px; right: 16px; }
   .district-map { bottom: 16px; left: 16px; width: 123px; }
   .controls { bottom: 16px; right: 16px; max-width: calc(100% - 162px); }
+}
+@media (max-width: 480px) {
+  .mission { top: 127px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .health-fill { transition: none; }
 }

@@ -2,6 +2,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import type { Point } from "../entities/EntityManager";
 import type { DriverProfile } from "../entities/Appearance";
 import type { TrafficCar, TrafficSystem } from "./TrafficSystem";
+import { MIN_TRAFFIC_IMPACT_SPEED } from "./HealthSystem";
 
 export interface DriveInput { throttle: number; steer: number; brake: boolean }
 const ENTRY_SPEED = 2.4;
@@ -134,6 +135,26 @@ export class VehicleSystem {
       body.setNextKinematicRotation(rotation(yaw));
     }
     this.updateDrivers(dt);
+  }
+
+  /** Sweep both moving bodies before Rapier commits their next kinematic poses. */
+  pedestrianImpact(player: RAPIER.Collider, playerDelta: Point, dt: number): number {
+    let strongest = 0;
+    for (const [car, { body, collider }] of this.bodies) {
+      if (car.offRoute || car.speed < MIN_TRAFFIC_IMPACT_SPEED) continue;
+      const from = body.translation();
+      const to = this.traffic.pose(car, 1);
+      const delta = { x: to.x - from.x, y: 0, z: to.z - from.z };
+      const speed = Math.hypot(delta.x, delta.z) / dt;
+      if (speed < MIN_TRAFFIC_IMPACT_SPEED - .001) continue;
+      // The controller leaves a .025 m skin around the player capsule.
+      const hit = player.castCollider(playerDelta, collider, delta, .045, 1, true);
+      if (!hit) continue;
+      const closing = ((playerDelta.x - delta.x) * hit.normal1.x +
+        (playerDelta.z - delta.z) * hit.normal1.z) / dt;
+      if (closing > 2) strongest = Math.max(strongest, car.speed);
+    }
+    return strongest;
   }
 
   dispose(): void {

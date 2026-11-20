@@ -110,3 +110,32 @@ it("sweeps the player's car against a wall instead of driving through it", () =>
     world.free();
   }
 });
+
+it("detects a fast vehicle contact but not a slow car or a nearby miss", () => {
+  for (const [speed, lateral, playerMove, expected] of [
+    [8, 0, 0, true], [2, 0, 0, false], [8, 2, 0, false],
+    [8, 1.17, -.13, true], [8, 0, .18, false],
+  ] as const) {
+    const world = new RAPIER.World({ x: 0, y: 0, z: 0 });
+    world.timestep = FIXED_DT;
+    const traffic = new TrafficSystem([downtownTraffic[0]]);
+    const vehicles = new VehicleSystem(world, traffic);
+    const [car] = traffic.cars;
+    const start = traffic.pose(car, 1);
+    const playerPoint = { x: start.x + car.spawn.model.length / 2 + .41, y: .025, z: start.z + lateral };
+    const player = new EntityManager().spawn("player", playerDefinition, playerPoint);
+    const movement = new MovementSystem(world, player);
+    try {
+      world.step();
+      car.speed = speed;
+      vehicles.step(FIXED_DT, neutral, playerPoint);
+      const delta = lateral ? { x: 0, y: 0, z: playerMove } : { x: playerMove, y: 0, z: 0 };
+      expect(vehicles.pedestrianImpact(movement.collider, delta, FIXED_DT) > 0,
+        `speed ${speed}, lateral offset ${lateral}, player movement ${playerMove}`).toBe(expected);
+    } finally {
+      movement.dispose();
+      vehicles.dispose();
+      world.free();
+    }
+  }
+});

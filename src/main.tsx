@@ -9,6 +9,7 @@ function App() {
   const mount = useRef<HTMLDivElement>(null);
   const game = useRef<Game | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [run, setRun] = useState(0);
   useEffect(() => {
     const token = new AbortController();
     void Game.create(mount.current!, (snapshot) => useHud.setState({ snapshot }), token.signal)
@@ -29,12 +30,16 @@ function App() {
       game.current = null;
       useHud.setState({ snapshot: null });
     };
-  }, []);
+  }, [run]);
+  const restart = () => {
+    setStatus("loading");
+    setRun((current) => current + 1);
+  };
   return (
     <main className="app">
       <div ref={mount} className="world" />
       {status === "ready" ?
-        <HUD pause={() => game.current?.togglePause()} advance={(id) => game.current?.advanceDialogue(id)} /> :
+        <HUD pause={() => game.current?.togglePause()} advance={(id) => game.current?.advanceDialogue(id)} restart={restart} /> :
         <div className="loading" role={status === "error" ? "alert" : "status"}>
           <div className="brand">PROVO<span>.</span></div>
           <p>{status === "error" ? "Couldn’t start the game. A browser with WebGL 2 enabled is required." : "Loading downtown…"}</p>

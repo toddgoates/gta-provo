@@ -25,7 +25,7 @@ export class MovementSystem {
     this.controller.enableSnapToGround(.27);
   }
 
-  prepare(dt: number, { forward, strafe, sprint, jump, heading }: WalkInput): void {
+  prepare(dt: number, { forward, strafe, sprint, jump, heading }: WalkInput): Point {
     const magnitude = Math.max(1, Math.hypot(forward, strafe));
     const speed = (sprint ? 8.4 : 4.65) / magnitude;
     const dx = (strafe * Math.cos(heading) - forward * Math.sin(heading)) * speed;
@@ -41,6 +41,7 @@ export class MovementSystem {
     }
     const pos = this.body.translation();
     this.body.setNextKinematicTranslation({ x: pos.x + delta.x, y: pos.y + delta.y, z: pos.z + delta.z });
+    return delta;
   }
 
   commit(dt: number): void {

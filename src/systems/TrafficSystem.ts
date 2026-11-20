@@ -143,8 +143,13 @@ export class TrafficSystem {
       const width = model.width / 2;
       for (let step = 0; step <= lookAhead; step += .45) {
         const p = roadPose(road, car.distance + step);
-        if ((pedestrian && pedestrian.y < model.height + .1 &&
-          Math.hypot(pedestrian.x - p.x, pedestrian.z - p.z) < width + .55) || obstacles.some((o) => {
+        if (pedestrian && pedestrian.y < model.height + .1 &&
+          Math.hypot(pedestrian.x - p.x, pedestrian.z - p.z) < width + .55) {
+          // Drivers brake, but cannot stop instantly if someone steps into the lane late.
+          target = Math.min(target, Math.sqrt(2 * BRAKE * Math.max(0, step - model.length / 2 - .75)));
+          break;
+        }
+        if (obstacles.some((o) => {
           const x = p.x - o.x, z = p.z - o.z;
           return Math.abs(x * Math.cos(o.yaw) - z * Math.sin(o.yaw)) < o.halfW + width + .15
             && Math.abs(x * Math.sin(o.yaw) + z * Math.cos(o.yaw)) < o.halfL + width;

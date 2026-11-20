@@ -41,13 +41,36 @@ function PauseMenu({ resume }: { resume: () => void }) {
   );
 }
 
-export function HUD({ pause, advance }: { pause: () => void; advance: (choiceId?: string) => void }) {
+function DeathScreen({ restart }: { restart: () => void }) {
+  const button = useRef<HTMLButtonElement>(null);
+  useEffect(() => { button.current?.focus(); }, []);
+  return (
+    <div className="veil death-veil">
+      <section className="death-screen" role="dialog" aria-modal="true" aria-labelledby="death-title">
+        <div className="eyebrow">Downtown · End of the road</div>
+        <h2 id="death-title"><span>Frick!</span> You died</h2>
+        <button ref={button} type="button" onClick={restart}>Start over <span aria-hidden="true">↵</span></button>
+      </section>
+    </div>
+  );
+}
+
+export function HUD({ pause, advance, restart }: { pause: () => void; advance: (choiceId?: string) => void; restart: () => void }) {
   const hud = useHud((s) => s.snapshot);
   if (!hud) return null;
-  const inScene = hud.mode === "dialogue" || hud.mode === "paused";
+  const inScene = hud.mode === "dialogue" || hud.mode === "paused" || hud.mode === "dead";
   return (
     <div className="hud">
-      <div className="masthead"><div className="brand">PROVO<span>.</span></div><div className="edition">UTAH VALLEY <i /> DOWNTOWN</div></div>
+      <div className="masthead">
+        <div className="brand">PROVO<span>.</span></div>
+        <div className="edition">UTAH VALLEY <i /> DOWNTOWN</div>
+        <div className="health panel">
+          <div className="health-label" aria-hidden="true"><span>Health</span><span>{hud.health}%</span></div>
+          <div className="health-track" role="progressbar" aria-label="Health" aria-valuenow={hud.health} aria-valuemin={0} aria-valuemax={100}>
+            <div className="health-fill" style={{ width: `${hud.health}%` }} />
+          </div>
+        </div>
+      </div>
       {!inScene && <button type="button" className="pause-toggle" onClick={pause} aria-label="Pause game">Ⅱ</button>}
       {!inScene && (
         <>
@@ -80,6 +103,7 @@ export function HUD({ pause, advance }: { pause: () => void; advance: (choiceId?
       )}
       {hud.mode === "dialogue" && hud.dialogue && <DialogueBox dialogue={hud.dialogue} advance={advance} />}
       {hud.mode === "paused" && <PauseMenu resume={pause} />}
+      {hud.mode === "dead" && <DeathScreen restart={restart} />}
       {DebugMenu && hud.debug && <Suspense fallback={null}><DebugMenu hud={hud} /></Suspense>}
     </div>
   );

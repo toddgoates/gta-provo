@@ -8,6 +8,7 @@ import type { Entity, Point } from "../entities/EntityManager";
 import { GameView } from "../render/GameView";
 import { DialogueSystem } from "../systems/DialogueSystem";
 import { InteractionSystem } from "../systems/InteractionSystem";
+import { HealthSystem } from "../systems/HealthSystem";
 import { MissionSystem } from "../systems/MissionSystem";
 import { MovementSystem } from "../systems/MovementSystem";
 import { SequenceDirector } from "../systems/SequenceDirector";
@@ -34,6 +35,7 @@ export class Game {
   private dialogue = new DialogueSystem(this.events, (flag) => this.flags.get(flag) ?? false);
   private triggers = new TriggerSystem(this.events, downtown.locations);
   private interaction = new InteractionSystem(this.events);
+  private health = new HealthSystem();
   private sequences = new SequenceDirector(this.director);
   private traffic = new TrafficSystem(downtownTraffic);
   private vehicles: VehicleSystem;
@@ -105,6 +107,7 @@ export class Game {
   }
 
   togglePause(): void {
+    if (this.director.mode === "dead") return;
     if (this.director.mode === "paused") this.director.resume();
     else this.director.pause();
     this.input.clear();
@@ -139,9 +142,11 @@ export class Game {
 
   private advance = (dt: number): void => {
     const { policy } = this.director;
+    this.health.step(dt);
+    let walkDelta: Point | undefined;
     if (policy.walk) {
       this.view.rig.look(...this.input.takeLook());
-      this.movement.prepare(dt, {
+      walkDelta = this.movement.prepare(dt, {
         forward: Number(this.input.down("KeyW")) - Number(this.input.down("KeyS")),
         strafe: Number(this.input.down("KeyD")) - Number(this.input.down("KeyA")),
         sprint: this.input.down("ShiftLeft") || this.input.down("ShiftRight"),
@@ -156,6 +161,8 @@ export class Game {
       steer: Number(this.input.down("KeyA")) - Number(this.input.down("KeyD")),
       brake: this.input.down("Space"),
     }, policy.walk ? this.player.position : undefined);
+    const impact = walkDelta && this.health.canTakeDamage
+      ? this.vehicles.pedestrianImpact(this.movement.collider, walkDelta, dt) : 0;
     this.physics.step();
     const occupied = this.vehicles.occupied;
     if (occupied) {
@@ -177,6 +184,15 @@ export class Game {
     }
     if (!policy.walk) return;
     this.movement.commit(dt);
+    if (this.health.applyTrafficImpact(impact)) {
+      if (this.health.depleted) {
+        this.director.die();
+        this.input.clear();
+        this.input.unlock();
+      }
+      this.publishHud();
+      if (this.health.depleted) return;
+    }
     this.triggers.update(this.player.position);
     this.candidate = this.interaction.nearest(this.player.position, this.entities.all());
     this.carCandidate = this.vehicles.nearest(this.player.position, this.movement.collider)?.car ?? null;
@@ -234,6 +250,7 @@ export class Game {
     const current = this.mission.current;
     this.publish({
       mode: this.director.mode,
+      health: this.health.value,
       mission: current && { title: current.mission.title, objective: current.objective.text },
       dialogue: this.dialogue.view,
       prompt: this.director.policy.interact ? this.candidate?.definition.interaction?.prompt ??
