@@ -15,10 +15,18 @@ export class HealthSystem {
   }
 
   applyTrafficImpact(speed: number): boolean {
-    if (!this.canTakeDamage || !(speed >= MIN_TRAFFIC_IMPACT_SPEED)) return false;
-    const damage = Math.min(28, Math.round(10 + speed * 1.2));
+    if (!(speed >= MIN_TRAFFIC_IMPACT_SPEED)) return false;
+    return this.applyDamage(Math.min(28, Math.round(10 + speed * 1.2)), HIT_COOLDOWN);
+  }
+
+  applyMeleeHit(damage: number): boolean {
+    return this.applyDamage(damage, .46);
+  }
+
+  private applyDamage(damage: number, cooldown: number): boolean {
+    if (!this.canTakeDamage || !(damage > 0)) return false;
     this.remaining = Math.max(0, this.remaining - damage);
-    this.cooldown = HIT_COOLDOWN;
+    this.cooldown = cooldown;
     return true;
   }
 }

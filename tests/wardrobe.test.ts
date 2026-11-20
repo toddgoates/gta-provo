@@ -29,7 +29,7 @@ it("updates clothing on the existing character rig", () => {
   equipGarment(player, "top", "marla-cardigan");
   view.updateWardrobe(player.wardrobe!);
   expect(arm.children[1]).toBe(sleeve);
-  expect(sleeve.scale.y).toBe(.48);
+  expect(sleeve.scale.y).toBe(.27);
   equipGarment(player, "top", "gray-tee");
   view.updateWardrobe(player.wardrobe!);
   expect(sleeve.scale.y).toBe(.19);

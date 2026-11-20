@@ -96,7 +96,8 @@ export function HUD({ pause, advance, restart }: { pause: () => void; advance: (
               <span><kbd>S</kbd> Brake / Reverse</span><span><kbd>SPACE</kbd> Brake</span>
             </> : <>
               <span><kbd>WASD</kbd> Walk</span><span><kbd>SHIFT</kbd> Sprint</span>
-              <span><kbd>SPACE</kbd> Jump</span><span>{hud.locked ? "Mouse to look" : "Click to capture · Drag to look"}</span>
+              <span><kbd>SPACE</kbd> Jump</span><span><kbd>F</kbd> Melee</span>
+              <span>{hud.locked ? "Mouse to look" : "Click to capture · Drag to look"}</span>
             </>}
           </div>
         </>

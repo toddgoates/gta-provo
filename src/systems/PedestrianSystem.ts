@@ -53,6 +53,9 @@ export function crossingIsClear({ from, to }: Crosswalk, traffic: readonly Cross
 export class PedestrianSystem {
   readonly walkers: readonly Pedestrian[];
   private groups: Group[];
+  private crossingWalkers = new Set<string>();
+
+  isCrossing(id: string): boolean { return this.crossingWalkers.has(id); }
 
   constructor(
     entities: EntityManager,
@@ -76,8 +79,9 @@ export class PedestrianSystem {
     this.walkers = this.groups.flatMap(({ walkers }) => walkers);
   }
 
-  step(dt: number, traffic: readonly CrossingTraffic[]): Crosswalk[] {
+  step(dt: number, traffic: readonly CrossingTraffic[], reacting: (id: string) => boolean = () => false): Crosswalk[] {
     const crossings: Crosswalk[] = [];
+    this.crossingWalkers.clear();
     for (const group of this.groups) {
       const { path, crossings: marked } = group.definition;
       for (const walker of group.walkers) { walker.previous = walker.entity.position; walker.speed = 0; }
@@ -98,6 +102,8 @@ export class PedestrianSystem {
       const yaw = Math.atan2(-dx, -dz);
       const baseX = from.x + dx * group.t, baseZ = from.z + dz * group.t;
       group.walkers.forEach((walker, i) => {
+        if (reacting(walker.entity.id)) return;
+        if (crosswalk) this.crossingWalkers.add(walker.entity.id);
         // World-aligned crossing offsets keep both directions inside the marked strip.
         const spacing = group.walkers.length === 1 ? 0 : (i % 2 ? .45 : -.45);
         const along = i === 2 ? .83 : 0;

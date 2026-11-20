@@ -11,6 +11,7 @@ import { GameView } from "../render/GameView";
 import { DialogueSystem } from "../systems/DialogueSystem";
 import { InteractionSystem } from "../systems/InteractionSystem";
 import { HealthSystem } from "../systems/HealthSystem";
+import { MeleeSystem } from "../systems/MeleeSystem";
 import { MissionSystem } from "../systems/MissionSystem";
 import { MovementSystem } from "../systems/MovementSystem";
 import { SequenceDirector } from "../systems/SequenceDirector";
@@ -45,6 +46,7 @@ export class Game {
   private player = this.entities.spawn("player", playerDefinition, downtown.spawns.player, .23);
   private npc = this.entities.spawn("marla-downtown", marlaDefinition, downtown.spawns.npc, Math.PI + .42);
   private pedestrians = new PedestrianSystem(this.entities, downtownPedestrians, createPedestrianLook);
+  private melee: MeleeSystem;
   private view: GameView;
   private physics: RAPIER.World;
   private district: WorldManager;
@@ -72,6 +74,10 @@ export class Game {
     this.district = new WorldManager(this.physics, downtown);
     this.view.scene.add(this.district.root);
     this.movement = new MovementSystem(this.physics, this.player);
+    this.melee = new MeleeSystem(this.player, this.pedestrians.walkers.map(({ entity }) => entity), (from, to) => {
+      const ray = new RAPIER.Ray({ ...from, y: from.y + .88 }, { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z });
+      return !this.physics.castRay(ray, 1, true, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, this.movement.collider);
+    });
     this.view.addActor(this.player);
     this.view.addActor(this.npc);
     for (const { entity } of this.pedestrians.walkers) this.view.addActor(entity);
@@ -148,14 +154,16 @@ export class Game {
   private advance = (dt: number): void => {
     const { policy } = this.director;
     this.health.step(dt);
+    const strike = this.input.take("KeyF");
+    const attackSpeed = this.melee.attacking || strike ? .28 : 1;
     let walkDelta: Point | undefined;
     if (policy.walk) {
       this.view.rig.look(...this.input.takeLook());
       walkDelta = this.movement.prepare(dt, {
-        forward: Number(this.input.down("KeyW")) - Number(this.input.down("KeyS")),
-        strafe: Number(this.input.down("KeyD")) - Number(this.input.down("KeyA")),
-        sprint: this.input.down("ShiftLeft") || this.input.down("ShiftRight"),
-        jump: this.input.take("Space"),
+        forward: attackSpeed * (Number(this.input.down("KeyW")) - Number(this.input.down("KeyS"))),
+        strafe: attackSpeed * (Number(this.input.down("KeyD")) - Number(this.input.down("KeyA"))),
+        sprint: attackSpeed === 1 && (this.input.down("ShiftLeft") || this.input.down("ShiftRight")),
+        jump: this.input.take("Space") && attackSpeed === 1,
         heading: this.view.rig.heading,
       });
     }
@@ -163,7 +171,7 @@ export class Game {
     if (policy.drive && use) this.vehicles.exitRequested = true;
     const crossings = this.pedestrians.step(dt, this.traffic.cars.map((car) => ({
       ...this.traffic.pose(car, 1), speed: car.speed, length: car.spawn.model.length, width: car.spawn.model.width,
-    })));
+    })), (id) => this.melee.hasReactor(id));
     this.vehicles.step(dt, {
       throttle: Number(this.input.down("KeyW")) - Number(this.input.down("KeyS")),
       steer: Number(this.input.down("KeyA")) - Number(this.input.down("KeyD")),
@@ -174,6 +182,7 @@ export class Game {
     this.physics.step();
     const occupied = this.vehicles.occupied;
     if (occupied) {
+      this.melee.step(dt, false, false);
       const { x, z, yaw } = this.traffic.pose(occupied, 1);
       this.player.position = { x, y: 0, z };
       this.player.yaw = yaw;
@@ -192,7 +201,10 @@ export class Game {
     }
     if (!policy.walk) return;
     this.movement.commit(dt);
-    if (this.health.applyTrafficImpact(impact)) {
+    const counterDamage = this.melee.step(dt, strike, true, (id) => !this.pedestrians.isCrossing(id));
+    const counterHit = this.health.applyMeleeHit(counterDamage);
+    if (counterHit) this.melee.playerHit();
+    if (this.health.applyTrafficImpact(impact) || counterHit) {
       if (this.health.depleted) {
         this.director.die();
         this.input.clear();
@@ -204,7 +216,7 @@ export class Game {
     this.triggers.update(this.player.position);
     this.candidate = this.interaction.nearest(this.player.position, this.entities.all());
     this.carCandidate = this.vehicles.nearest(this.player.position, this.movement.collider)?.car ?? null;
-    if (!use) return;
+    if (!use || this.melee.attacking) return;
     if (this.candidate) this.interaction.use(this.candidate);
     else if (this.carCandidate && this.director.setFreeMode("driving")) {
       this.vehicles.enter(this.carCandidate, this.player.position);
@@ -233,9 +245,10 @@ export class Game {
       this.view.rig.update(dt, vehiclePose ? { ...vehiclePose, y: 0 } : interpolated, focus, this.castCameraRay, vehiclePose?.yaw);
     }
     this.view.updateTraffic(this.traffic, alpha);
-    this.view.updatePedestrians(this.pedestrians.walkers, alpha);
+    this.view.updatePedestrians(this.pedestrians.walkers, alpha, this.melee);
     this.view.updateDrivers(this.vehicles.drivers);
-    this.view.render(this.player, interpolated, walk ? this.movement.speed : 0, this.goal, camera === "hold" ? 0 : dt, !!occupied);
+    this.view.render(this.player, interpolated, walk ? this.movement.speed : 0, this.goal,
+      camera === "hold" ? 0 : dt, !!occupied, this.melee.getPose(this.player.id));
     if (import.meta.env.DEV && dt > 0) this.fps += (1 / dt - this.fps) * .09;
     this.hudElapsed += dt;
     if (this.hudElapsed >= .1) this.publishHud();

@@ -20,6 +20,7 @@ Open the URL printed by Vite (normally `http://localhost:5173`). Walk toward **M
 | Space | Jump |
 | Click the scene / left-drag | Capture the mouse for camera control / look without pointer lock |
 | E | Use the nearby interaction |
+| F | Right punch; two taps chain right–left, three add a kick |
 | Esc | Pause or resume; releasing pointer lock also pauses |
 | F1 | Toggle the debug panel (development only) |
 
@@ -46,5 +47,6 @@ To take a car, approach it while it's stopped or crawling and press **E** when p
 - A blond, blue-eyed player in a light gray tee and blue jeans. Clothing is defined in swappable slots; there is no wardrobe menu yet.
 - A mission HUD, north-up minimap, pause menu, and development-only debug readout.
 - A red health bar that starts at 100%. Fast traffic impacts on foot reduce health. At zero, **Start over** resets the run.
+- Ambient pedestrians may flee or fight back after being hit. Those who fight stay committed, even after taking a full combo. Their counterattacks reduce player health. Marla remains a dialogue-only NPC.
 
 No vehicle damage, audio, GLB assets, saves, or backend are shipped. Rapier’s compatibility package embeds WASM, so Vite can warn about the initial bundle size even when the build succeeds. See [Architecture](ARCHITECTURE.md) and [Game Design](GAME_DESIGN.md).

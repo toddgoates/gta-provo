@@ -8,8 +8,14 @@ export function buildCharacter(entity: Entity) {
   const { wardrobe } = entity;
   if (!appearance || !wardrobe) throw new Error(`Missing character appearance: ${entity.id}`);
 
+  const root = new THREE.Group();
+  root.scale.x = appearance.build === "slim" ? .9 : appearance.build === "broad" ? 1.1 : 1;
+  const torso = new THREE.Group();
+  torso.position.y = .91;
   const group = new THREE.Group();
-  group.scale.x = appearance.build === "slim" ? .9 : appearance.build === "broad" ? 1.1 : 1;
+  group.position.y = -.91;
+  torso.add(group);
+  root.add(torso);
   const cube = new THREE.BoxGeometry(1, 1, 1);
   const mat = (color: number) => new THREE.MeshLambertMaterial({ color });
   const skin = mat(appearance.skin);
@@ -54,7 +60,9 @@ export function buildCharacter(entity: Entity) {
   }
 
   const limbs: THREE.Group[] = [];
+  const joints: THREE.Group[] = [];
   const sleeves: THREE.Mesh[] = [];
+  const lowerSleeves: THREE.Mesh[] = [];
   const jeanSeams: THREE.Mesh[] = [];
   for (const side of [-1, 1]) {
     part(group, whites, side * .082, 1.648, -.171, .074, .044, .014);
@@ -62,17 +70,28 @@ export function buildCharacter(entity: Entity) {
 
     const leg = new THREE.Group();
     leg.position.set(side * .13, .78, 0);
-    part(leg, pants, 0, -.34, 0, .208, .65, .24);
-    jeanSeams.push(part(leg, seams, side * .104, -.34, -.03, .013, .62, .02));
-    part(leg, shoes, 0, -.705, -.05, .22, .15, .34);
-    group.add(leg);
+    const knee = new THREE.Group();
+    knee.position.y = -.33;
+    part(leg, pants, 0, -.17, 0, .208, .35, .24);
+    part(knee, pants, 0, -.17, 0, .198, .35, .23);
+    jeanSeams.push(part(leg, seams, side * .104, -.16, -.03, .013, .31, .02));
+    jeanSeams.push(part(knee, seams, side * .099, -.16, -.03, .013, .31, .02));
+    part(knee, shoes, 0, -.375, -.05, .22, .15, .34);
+    leg.add(knee);
+    root.add(leg);
 
     const arm = new THREE.Group();
     arm.position.set(side * .35, 1.44, 0);
-    part(arm, skin, 0, -.268, 0, .133, .55, .154);
-    sleeves.push(part(arm, shirt, 0, -.22, 0, .153, .48, .193));
+    const elbow = new THREE.Group();
+    elbow.position.y = -.25;
+    part(arm, skin, 0, -.135, 0, .133, .28, .154);
+    sleeves.push(part(arm, shirt, 0, -.125, 0, .153, .27, .193));
+    part(elbow, skin, 0, -.145, 0, .132, .31, .153);
+    lowerSleeves.push(part(elbow, shirt, 0, -.097, 0, .149, .22, .185));
+    arm.add(elbow);
     group.add(arm);
     limbs.push(leg, arm);
+    joints.push(knee, elbow);
   }
 
   let applied: Wardrobe | undefined;
@@ -88,12 +107,13 @@ export function buildCharacter(entity: Entity) {
     if (outfit.bottoms.seam !== null) seams.color.setHex(outfit.bottoms.seam);
     const short = outfit.top.sleeves === "short";
     for (const sleeve of sleeves) {
-      sleeve.position.y = short ? -.078 : -.22;
-      sleeve.scale.y = short ? .19 : .48;
+      sleeve.position.y = short ? -.078 : -.125;
+      sleeve.scale.y = short ? .19 : .27;
     }
+    for (const sleeve of lowerSleeves) sleeve.visible = !short;
     applied = next;
   }
 
   updateWardrobe(wardrobe);
-  return { group, limbs, updateWardrobe };
+  return { group: root, limbs, joints, torso, updateWardrobe };
 }

@@ -6,6 +6,8 @@ import type { TrafficSystem } from "../systems/TrafficSystem";
 import { buildCharacter } from "./CharacterView";
 import type { FleeingDriver } from "../systems/VehicleSystem";
 import type { Pedestrian } from "../systems/PedestrianSystem";
+import type { MeleePose, MeleeSystem } from "../systems/MeleeSystem";
+import { poseCharacter } from "./CharacterMotion";
 
 export class GameView {
   readonly renderer: THREE.WebGLRenderer;
@@ -94,22 +96,24 @@ export class GameView {
       view.group.position.set(driver.position.x, driver.position.y, driver.position.z);
       view.group.rotation.set(-driver.tumble, driver.yaw, 0, "YXZ");
       const stride = driver.running ? Math.sin(this.time * 15) * .78 : .45;
-      this.animateStride(view, stride);
+      poseCharacter(view, stride);
     }
   }
 
-  updatePedestrians(walkers: readonly Pedestrian[], alpha: number): void {
-    for (const { entity, previous, phase, speed } of walkers) {
+  updatePedestrians(walkers: readonly Pedestrian[], alpha: number, melee: MeleeSystem): void {
+    for (const { entity, previous, phase, speed: walkSpeed } of walkers) {
+      const speed = melee.hasReactor(entity.id) ? melee.reactionSpeed(entity.id) : walkSpeed;
       const view = this.actors.get(entity.id)!.view;
       const { x, y, z } = entity.position;
       view.group.position.set(previous.x + (x - previous.x) * alpha, previous.y + (y - previous.y) * alpha,
         previous.z + (z - previous.z) * alpha);
       view.group.rotation.y = entity.yaw;
-      this.animateStride(view, Math.sin(this.time * (speed > 2 ? 9 : 7) + phase) * Math.min(.43, speed * .175));
+      poseCharacter(view, Math.sin(this.time * (speed > 4 ? 13 : speed > 2 ? 9 : 7) + phase) * Math.min(.66, speed * .175),
+        melee.getPose(entity.id));
     }
   }
 
-  render(player: Entity, position: Point, speed: number, goal: Point | undefined, dt: number, seated = false): void {
+  render(player: Entity, position: Point, speed: number, goal: Point | undefined, dt: number, seated = false, melee?: MeleePose): void {
     this.time += dt;
     for (const { entity, view } of this.actors.values()) {
       if (entity.wardrobe) view.updateWardrobe(entity.wardrobe);
@@ -119,7 +123,7 @@ export class GameView {
     actor.group.position.set(position.x, position.y, position.z);
     actor.group.rotation.y = player.yaw;
     const stride = Math.sin(this.time * (speed > 6 ? 14 : 10)) * Math.min(.65, speed * .085);
-    this.animateStride(actor, stride);
+    poseCharacter(actor, stride, melee);
     const onBlock = Math.abs(position.x) > 9.2 && Math.abs(position.z) > 9.2;
     this.shadow.position.set(position.x, onBlock ? .163 : .004, position.z);
     this.shadow.visible = !seated;
@@ -130,10 +134,6 @@ export class GameView {
       this.crystal.rotation.y = this.time * 1.8;
     }
     this.renderer.render(this.scene, this.rig.camera);
-  }
-
-  private animateStride(actor: ReturnType<typeof buildCharacter>, stride: number): void {
-    actor.limbs.forEach((limb, index) => { limb.rotation.x = (index === 0 || index === 3) ? stride : -stride; });
   }
 
   dispose(): void {

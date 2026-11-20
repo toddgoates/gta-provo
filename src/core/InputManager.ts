@@ -1,5 +1,5 @@
 const heldKeys = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight", "Space"]);
-const actions = new Set(["Space", "KeyE"]);
+const actions = new Set(["Space", "KeyE", "KeyF"]);
 
 export class InputManager {
   private held = new Set<string>();
