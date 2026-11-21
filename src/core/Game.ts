@@ -1,5 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { downtown } from "../content/downtown";
+import { cashPickupPath, cityAmbiencePath, localAudioUrl } from "../content/audio";
 import { downtownPedestrians } from "../content/pedestrians";
 import { policeConfig, reinforcementLooks, reinforcementPoints } from "../content/police";
 import { createPedestrianLook } from "../content/characters/pedestrianLooks";
@@ -12,6 +13,7 @@ import { GameView } from "../render/GameView";
 import { DialogueSystem } from "../systems/DialogueSystem";
 import { InteractionSystem } from "../systems/InteractionSystem";
 import { HealthSystem } from "../systems/HealthSystem";
+import { AudioSystem } from "../systems/AudioSystem";
 import { CashSystem } from "../systems/CashSystem";
 import { MeleeSystem } from "../systems/MeleeSystem";
 import { CrimeSystem } from "../systems/CrimeSystem";
@@ -47,6 +49,8 @@ export class Game {
   private triggers = new TriggerSystem(this.events, downtown.locations);
   private interaction = new InteractionSystem(this.events);
   private health = new HealthSystem();
+  private audio = new AudioSystem();
+  private audioInput = new AbortController();
   private sequences = new SequenceDirector(this.director);
   private traffic = new TrafficSystem(downtownTraffic);
   private vehicles: VehicleSystem;
@@ -143,6 +147,11 @@ export class Game {
       () => { if (this.director.policy.physics) this.togglePause(); },
       import.meta.env.DEV ? () => { this.debug = !this.debug; this.publishHud(); } : undefined,
     );
+    this.audio.play({ url: localAudioUrl(cityAmbiencePath), channel: "ambience", loop: true });
+    const unlockAudio = (event: Event) => { if (event.isTrusted) this.audio.unlock(); };
+    const audioGesture = { signal: this.audioInput.signal, capture: true };
+    window.addEventListener("pointerdown", unlockAudio, audioGesture);
+    window.addEventListener("keydown", unlockAudio, audioGesture);
     this.mission.start(firstShift.id);
     const dialogues = new Map([[marlaDialogue.id, marlaDialogue]]);
     this.events.on("interaction:used", ({ entityId }) => {
@@ -152,6 +161,7 @@ export class Game {
       const definition = dialogues.get(interaction.dialogueId);
       if (!definition || !this.sequences.begin(dialogueCamera, entityId)) return;
       if (!this.dialogue.start(definition, entityId)) { this.sequences.end(); return; }
+      this.syncDialogueAudio();
       this.input.clear();
       this.input.unlock();
       this.publishHud();
@@ -175,6 +185,7 @@ export class Game {
     if (this.director.mode === "dead") return;
     if (this.director.mode === "paused") this.director.resume();
     else this.director.pause();
+    this.audio.setPaused(this.director.mode === "paused");
     this.input.clear();
     this.input.unlock();
     this.publishHud();
@@ -182,7 +193,7 @@ export class Game {
 
   advanceDialogue(choiceId?: string): void {
     if (this.director.mode !== "dialogue") return;
-    this.dialogue.advance(choiceId);
+    if (this.dialogue.advance(choiceId)) this.syncDialogueAudio();
     this.publishHud();
   }
 
@@ -198,6 +209,8 @@ export class Game {
     if (this.disposed) return;
     this.disposed = true;
     this.loop.stop();
+    this.audioInput.abort();
+    this.audio.dispose();
     this.input.dispose();
     this.mission.dispose();
     this.crime.dispose();
@@ -285,6 +298,7 @@ export class Game {
     if (trafficHit || counterHit || fallHit) {
       if (this.health.depleted) {
         this.director.die();
+        this.audio.setPaused(true);
         this.police.reset();
         this.input.clear();
         this.input.unlock();
@@ -292,7 +306,10 @@ export class Game {
       this.publishHud();
       if (this.health.depleted) return;
     }
-    if (this.cash.step(dt, this.player.position)) this.publishHud();
+    if (this.cash.step(dt, this.player.position)) {
+      this.audio.play({ url: localAudioUrl(cashPickupPath), channel: "sfx" });
+      this.publishHud();
+    }
     this.triggers.update(this.player.position);
     this.candidate = this.interaction.nearest(this.player.position, this.entities.all());
     this.carCandidate = this.vehicles.nearest(this.player.position, this.movement.collider)?.car ?? null;
@@ -328,6 +345,7 @@ export class Game {
   }
 
   private render = (dt: number, alpha: number): void => {
+    this.audio.update(dt);
     const { position } = this.player;
     const last = this.movement.previous;
     const interpolated = {
@@ -353,6 +371,13 @@ export class Game {
     this.hudElapsed += dt;
     if (this.hudElapsed >= .1) this.publishHud();
   };
+
+  private syncDialogueAudio(): void {
+    this.audio.setDialogue(this.director.mode === "dialogue");
+    const clip = this.dialogue.currentAudio;
+    if (clip) this.audio.play({ url: localAudioUrl(clip), channel: "voice" });
+    else this.audio.stop("voice");
+  }
 
   private castCameraRay = (origin: Point, direction: Point, distance: number): number | undefined => {
     const car = this.vehicles.occupiedCollider;

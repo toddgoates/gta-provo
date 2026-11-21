@@ -59,4 +59,12 @@ To take a car, approach it while it's stopped or crawling and press **E** when p
 - Pedestrians try to dodge a player-driven car. On impact, they tumble away from the bumper and bounce before settling. A slower hit knocks them down briefly before they flee; fast impacts are fatal. Police respond to witnessed hits and treat fatal hits more seriously.
 - Knocked-out NPCs drop glowing cash bundles worth $1–$300. Nine out of ten drops are under $100. Walk over a bundle to add it to the HUD balance.
 
-No vehicle damage, audio, GLB assets, saves, or backend are shipped. Rapier’s compatibility package embeds WASM, so Vite can warn about the initial bundle size even when the build succeeds. See [Architecture](ARCHITECTURE.md) and [Game Design](GAME_DESIGN.md).
+No vehicle damage, GLB assets, saves, or backend are shipped. Rapier’s compatibility package embeds WASM, so Vite can warn about the initial bundle size even when the build succeeds. See [Architecture](ARCHITECTURE.md) and [Game Design](GAME_DESIGN.md).
+
+## Audio assets
+
+Copy `city-ambience-1.mp3` to `public/audio/ambience/city-ambience-1.mp3`. The game starts the loop after your first click or keypress; without the file, the game remains playable in silence.
+
+Copy `chaching.mp3` to `public/audio/sfx/chaching.mp3`. It plays when you collect a cash bundle.
+
+For future voice lines, put files in `public/audio/dialogue/` and set the dialogue node's `audio` field to a path relative to `public/`, for example `audio/dialogue/marla-hello.mp3`. Conversations lower ambience and music, even when a line is text-only. Music and sound effects can play alongside ambience. Pausing the game pauses all channels; resuming continues playback.

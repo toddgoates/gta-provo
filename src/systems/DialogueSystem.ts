@@ -13,6 +13,10 @@ export class DialogueSystem {
 
   constructor(private readonly events: EventBus, private readonly readFlag: (flag: string) => boolean) {}
 
+  get currentAudio(): string | undefined {
+    return this.active?.definition.nodes[this.active.nodeId].audio;
+  }
+
   start(definition: DialogueDefinition, npcId: string): boolean {
     if (this.active || !definition.nodes[definition.start]) return false;
     this.active = { definition, nodeId: definition.start, npcId };
