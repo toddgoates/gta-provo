@@ -135,6 +135,19 @@ export class GameView {
       const { x, y, z } = entity.position;
       view.group.position.set(previous.x + (x - previous.x) * alpha, previous.y + (y - previous.y) * alpha,
         previous.z + (z - previous.z) * alpha);
+      const impact = melee.impactPose(entity.id);
+      if (impact) {
+        view.group.rotation.set(impact.pitch, entity.yaw, impact.roll, "YXZ");
+        view.group.position.y += .19 * Math.sin(impact.pitch);
+        poseCharacter(view, 0);
+        view.limbs[0].rotation.x = .31;
+        view.limbs[2].rotation.x = -.28;
+        view.limbs[1].rotation.z = -.48;
+        view.limbs[3].rotation.z = .63;
+        view.joints[1].rotation.x = .22;
+        view.joints[2].rotation.x = -.12;
+        continue;
+      }
       const fall = melee.fallProgress(entity.id);
       view.group.rotation.set(fall === undefined ? 0 : Math.PI * .5 * fall * fall,
         entity.yaw, 0, "YXZ");
@@ -145,11 +158,20 @@ export class GameView {
         view.limbs[3].rotation.z = .63 * fall;
         view.joints[1].rotation.x = .22 * fall;
         view.joints[2].rotation.x = -.12 * fall;
-        if (fall === 1) this.addDownedMark(entity);
+        if (fall === 1 && melee.healthOf(entity.id) === 0) this.addDownedMark(entity);
         continue;
       }
+      const dodge = Math.sin(Math.PI * melee.dodgeProgress(entity.id));
+      view.group.position.y += dodge * .38;
       poseCharacter(view, Math.sin(this.time * (speed > 4 ? 13 : speed > 2 ? 9 : 7) + phase) * Math.min(.66, speed * .175),
         melee.getPose(entity.id));
+      if (dodge > 0) {
+        view.limbs[0].rotation.x = .52 * dodge;
+        view.joints[0].rotation.x = -.77 * dodge;
+        view.limbs[1].rotation.x = .75 * dodge;
+        view.limbs[3].rotation.x = .95 * dodge;
+        view.torso.rotation.x = -.21 * dodge;
+      }
     }
   }
 

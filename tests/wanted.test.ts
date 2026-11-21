@@ -55,6 +55,27 @@ it("only counts player crimes witnessed by a conscious nearby officer with a cle
   expect(detected).toHaveBeenCalledTimes(3);
 });
 
+it("grades witnessed vehicle hits more severely if the impact is fatal", () => {
+  const events = new EventBus();
+  const entities = new EntityManager();
+  const officer = entities.spawn("cop", police, { ...origin, x: 8 });
+  const victim = entities.spawn("ped", npc, origin);
+  const wanted = new WantedLevelSystem();
+  let clear = false;
+  new CrimeSystem(events, "player", {
+    findEntity: (id) => entities.get(id), officers: () => [officer], conscious: () => true,
+    clearSight: () => clear, radius: 14, detected: ({ kind }) => wanted.report(kind),
+  });
+  const incident = { offenderId: "player", victimId: victim.id, position: origin, source: "vehicle" as const };
+  events.emit("combat:hit", { ...incident, id: "unseen", knockedOut: false });
+  expect(wanted.level).toBe(0);
+  clear = true;
+  events.emit("combat:hit", { ...incident, id: "slow", knockedOut: false });
+  expect(wanted.level).toBe(1);
+  events.emit("combat:hit", { ...incident, id: "fast", knockedOut: true });
+  expect(wanted.level).toBe(3);
+});
+
 it("counts a knockout once even if an overlapping event repeats the incident ID", () => {
   const events = new EventBus();
   const entities = new EntityManager();

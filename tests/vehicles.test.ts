@@ -116,6 +116,31 @@ it("sweeps the player's car against a wall instead of driving through it", () =>
   }
 });
 
+it("predicts a player-car impact and excludes a pedestrian safely outside the bumper", () => {
+  const world = new RAPIER.World({ x: 0, y: 0, z: 0 });
+  world.timestep = FIXED_DT;
+  const traffic = new TrafficSystem([downtownTraffic[0]]);
+  const vehicles = new VehicleSystem(world, traffic);
+  const entities = new EntityManager();
+  try {
+    world.step();
+    expect(vehicles.npcContacts([], FIXED_DT)).toEqual([]);
+    const [car] = traffic.cars;
+    const { x, z } = traffic.pose(car, 1);
+    const near = entities.spawn("near", playerDefinition, { x: x + car.spawn.model.length / 2 + .32, y: 0, z });
+    const clear = entities.spawn("clear", playerDefinition, { ...near.position, z: z + 2.7 });
+    vehicles.enter(car, { x, y: 0, z: z + 2 });
+    car.speed = 5;
+    vehicles.step(FIXED_DT, neutral);
+    const contacts = vehicles.npcContacts([near, clear], FIXED_DT);
+    expect(contacts.map(({ npc }) => npc.id)).toEqual([near.id]);
+    expect(contacts[0].eta).toBeLessThan(FIXED_DT);
+  } finally {
+    vehicles.dispose();
+    world.free();
+  }
+});
+
 it("detects a fast vehicle contact but not a slow car or a nearby miss", () => {
   for (const [speed, lateral, playerMove, expected] of [
     [8, 0, 0, true], [2, 0, 0, false], [8, 2, 0, false],

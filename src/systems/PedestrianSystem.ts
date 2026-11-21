@@ -89,7 +89,8 @@ export class PedestrianSystem {
 
   remove(id: string): void { this.actors = this.actors.filter(({ entity }) => entity.id !== id); }
 
-  step(dt: number, traffic: readonly CrossingTraffic[], reacting: (id: string) => boolean = () => false): Crosswalk[] {
+  step(dt: number, traffic: readonly CrossingTraffic[], reacting: (id: string) => boolean = () => false,
+    blocked: (from: Point, to: Point) => boolean = () => false): Crosswalk[] {
     const crossings: Crosswalk[] = [];
     this.crossingWalkers.clear();
     for (const walker of this.walkers) { walker.previous = walker.entity.position; walker.speed = 0; }
@@ -109,19 +110,26 @@ export class PedestrianSystem {
       }
       const speed = crosswalk ? 2.45 : group.speed;
       if (group.crossing) crossings.push(group.crossing);
-      group.t = Math.min(1, group.t + speed * dt / length);
+      const nextT = Math.min(1, group.t + speed * dt / length);
       const yaw = Math.atan2(-dx, -dz);
-      const baseX = from.x + dx * group.t, baseZ = from.z + dz * group.t;
-      group.walkers.forEach((walker, i) => {
-        if (reacting(walker.entity.id)) return;
-        if (crosswalk) this.crossingWalkers.add(walker.entity.id);
+      const baseX = from.x + dx * nextT, baseZ = from.z + dz * nextT;
+      const positions = group.walkers.map((_, i) => {
         // World-aligned crossing offsets keep both directions inside the marked strip.
         const spacing = group.walkers.length === 1 ? 0 : (i % 2 ? .45 : -.45);
         const along = i === 2 ? .83 : 0;
         const x = baseX + dz / length * spacing - Math.abs(dx / length) * along;
         const z = baseZ - dx / length * spacing - Math.abs(dz / length) * along;
         const y = Math.abs(x) > 9.2 && Math.abs(z) > 9.2 ? CURB : STREET;
-        walker.entity.position = { x, y, z };
+        return { x, y, z };
+      });
+      if (crosswalk) {
+        for (const { entity } of group.walkers) if (!reacting(entity.id)) this.crossingWalkers.add(entity.id);
+      }
+      if (!crosswalk && group.walkers.some(({ entity }, i) => !reacting(entity.id) && blocked(entity.position, positions[i]))) continue;
+      group.t = nextT;
+      group.walkers.forEach((walker, i) => {
+        if (reacting(walker.entity.id)) return;
+        walker.entity.position = positions[i];
         walker.entity.yaw = yaw;
         walker.speed = speed;
       });

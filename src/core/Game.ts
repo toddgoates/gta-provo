@@ -20,6 +20,7 @@ import type { WantedLevel } from "../systems/WantedLevelSystem";
 import { PoliceResponseSystem } from "../systems/PoliceResponseSystem";
 import { MissionSystem } from "../systems/MissionSystem";
 import { MovementSystem } from "../systems/MovementSystem";
+import { NpcColliders, WITHOUT_NPC_BODIES } from "../systems/NpcColliders";
 import { SequenceDirector } from "../systems/SequenceDirector";
 import { TriggerSystem } from "../systems/TriggerSystem";
 import { TrafficSystem } from "../systems/TrafficSystem";
@@ -61,6 +62,7 @@ export class Game {
   private physics: RAPIER.World;
   private district: WorldManager;
   private movement: MovementSystem;
+  private npcColliders: NpcColliders;
   private input: InputManager;
   private loop: GameLoop;
   private candidate: Entity | null = null;
@@ -85,8 +87,16 @@ export class Game {
     this.district = new WorldManager(this.physics, downtown);
     this.view.scene.add(this.district.root);
     this.movement = new MovementSystem(this.physics, this.player);
+    this.npcColliders = new NpcColliders(this.physics);
     this.melee = new MeleeSystem(this.player, () => this.pedestrians.walkers.map(({ entity }) => entity),
-      (from, to) => this.clearSight(from, to, .88), Math.random, (hit) => this.events.emit("combat:hit", hit));
+      (from, to) => this.clearSight(from, to, .88), Math.random, (hit) => this.events.emit("combat:hit", hit),
+      (point) => {
+        const ray = new RAPIER.Ray({ ...point, y: .55 }, { x: 0, y: -1, z: 0 });
+        const ground = this.physics.castRay(ray, 1.5, true,
+          RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
+          WITHOUT_NPC_BODIES);
+        return ground ? .55 - ground.timeOfImpact : -.01;
+      });
     this.view.addActor(this.player);
     this.view.addActor(this.npc);
     for (const { entity } of this.pedestrians.walkers) this.view.addActor(entity);
@@ -154,6 +164,7 @@ export class Game {
       this.publishHud();
     });
     // Populate Rapier's query data before the first movement and camera casts.
+    this.syncNpcColliders();
     this.physics.step();
     this.loop = new GameLoop(this.advance, this.render, () => this.director.policy.physics);
     this.loop.start();
@@ -193,6 +204,7 @@ export class Game {
     this.cash.dispose();
     this.events.clear();
     this.movement.dispose();
+    this.npcColliders.dispose();
     this.vehicles.dispose();
     this.district.dispose();
     this.physics.free();
@@ -221,14 +233,26 @@ export class Game {
     const crossings = this.pedestrians.step(dt, this.traffic.cars.map((car) => ({
       ...this.traffic.pose(car, 1), speed: car.speed, length: car.spawn.model.length, width: car.spawn.model.width,
     })), (id) => this.entities.get(id)?.definition.faction === "police"
-      ? this.police.controls(id) || this.melee.healthOf(id) === 0 : this.melee.hasReactor(id));
+      ? this.police.controls(id) || this.melee.isDown(id) : this.melee.hasReactor(id),
+    (from, to) => {
+      const player = this.player.position;
+      if (!walkDelta || Math.abs(player.y - to.y) >= 1.35) return false;
+      const x = player.x + walkDelta.x, z = player.z + walkDelta.z;
+      const nextGap = Math.hypot(to.x - x, to.z - z);
+      return nextGap < .65 && nextGap < Math.hypot(from.x - x, from.z - z);
+    });
     this.vehicles.step(dt, {
       throttle: Number(this.input.down("KeyW")) - Number(this.input.down("KeyS")),
       steer: Number(this.input.down("KeyA")) - Number(this.input.down("KeyD")),
       brake: this.input.down("Space"),
     }, policy.walk ? this.player.position : undefined, crossings);
+    if (policy.drive) {
+      const targets = this.pedestrians.walkers.map(({ entity }) => entity).filter(({ id }) => !this.melee.isDown(id));
+      for (const contact of this.vehicles.npcContacts(targets, dt)) this.melee.reactToVehicle(contact, dt);
+    }
     const impact = walkDelta && this.health.canTakeDamage
       ? this.vehicles.pedestrianImpact(this.movement.collider, walkDelta, dt) : 0;
+    this.syncNpcColliders();
     this.physics.step();
     const occupied = this.vehicles.occupied;
     if (occupied) {
@@ -288,8 +312,17 @@ export class Game {
     const ray = new RAPIER.Ray({ ...from, y: from.y + height }, direction);
     const flags = RAPIER.QueryFilterFlags.EXCLUDE_SENSORS | (fixedOnly ? RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC : 0);
     const occupied = this.vehicles?.occupiedCollider;
-    return !this.physics.castRay(ray, 1, true, flags, undefined, this.movement.collider,
+    return !this.physics.castRay(ray, 1, true, flags, WITHOUT_NPC_BODIES, this.movement.collider,
       undefined, (collider) => collider.handle !== occupied?.handle);
+  }
+
+  private syncNpcColliders(): void {
+    this.npcColliders.sync([
+      this.npc,
+      ...this.pedestrians.walkers.map(({ entity }) => entity).filter((entity) =>
+        entity.enabled && !this.melee.isDown(entity.id)),
+      ...this.vehicles.drivers.filter((driver) => driver.running),
+    ]);
   }
 
   private render = (dt: number, alpha: number): void => {
@@ -322,7 +355,7 @@ export class Game {
   private castCameraRay = (origin: Point, direction: Point, distance: number): number | undefined => {
     const car = this.vehicles.occupiedCollider;
     const hit = this.physics.castRay(new RAPIER.Ray(origin, direction), distance, true,
-      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, this.movement.collider,
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, WITHOUT_NPC_BODIES, this.movement.collider,
       undefined, (collider) => collider.handle !== car?.handle);
     return hit?.timeOfImpact;
   };

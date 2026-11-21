@@ -1,5 +1,9 @@
 import type { Entity, Point } from "../entities/EntityManager";
 import type { CrimeIncident } from "../core/EventBus";
+import { PEDESTRIAN_FATAL_SPEED } from "./VehicleSystem";
+import type { NpcVehicleContact } from "./VehicleSystem";
+import { launchImpact, stepImpact } from "./ImpactMotion";
+import type { ImpactMotion } from "./ImpactMotion";
 
 export const meleeMoves = [
   { duration: .39, impact: .17, reach: 1.36, damage: 9 },
@@ -9,6 +13,8 @@ export const meleeMoves = [
 
 export const MAX_PEDESTRIAN_HEALTH = 60;
 const FALL_DURATION = .55;
+const GET_UP_TIME = 1.35;
+const DODGE_TIME = .3;
 
 export interface MeleePose { move: number; progress: number; flinch: number }
 interface Swing { move: number; elapsed: number }
@@ -22,6 +28,10 @@ interface Fighter {
   cooldown: number;
   nextMove: number;
   speed: number;
+  tumble?: number;
+  dodge?: { from: Point; to: Point; elapsed: number };
+  vehiclePanic?: boolean;
+  launch?: ImpactMotion;
 }
 
 const distance = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.z - a.z);
@@ -44,7 +54,8 @@ export class MeleeSystem {
     private readonly pedestrians: readonly Entity[] | (() => readonly Entity[]),
     private readonly clearPath: ClearPath,
     private readonly random: () => number = Math.random,
-    private readonly reportHit: (hit: CrimeIncident & { knockedOut: boolean }) => void = () => {},
+    private readonly reportHit: (hit: CrimeIncident & { knockedOut: boolean; source?: "vehicle" }) => void = () => {},
+    private readonly floorAt: (point: Point) => number = (point) => onSidewalk(point) ? .15 : -.01,
   ) {}
 
   get attacking(): boolean { return !!this.swing; }
@@ -52,10 +63,57 @@ export class MeleeSystem {
   reactionSpeed(id: string): number { return this.fighters.get(id)?.speed ?? 0; }
   healthOf(id: string): number { return this.fighters.get(id)?.health ?? MAX_PEDESTRIAN_HEALTH; }
   forget(id: string): void { this.fighters.delete(id); }
+  isDown(id: string): boolean { return this.impactPose(id) !== undefined || this.fallProgress(id) !== undefined; }
+  impactPose(id: string): ImpactMotion | undefined { return this.fighters.get(id)?.launch; }
+
+  dodgeProgress(id: string): number {
+    const dodge = this.fighters.get(id)?.dodge;
+    return dodge ? dodge.elapsed / DODGE_TIME : 0;
+  }
 
   fallProgress(id: string): number | undefined {
     const fighter = this.fighters.get(id);
-    return fighter?.health === 0 ? fighter.fallElapsed / FALL_DURATION : undefined;
+    if (fighter?.launch) return;
+    if (fighter?.health === 0) return fighter.fallElapsed / FALL_DURATION;
+    if (fighter?.tumble !== undefined) {
+      return Math.min(1, fighter.tumble / .36, (GET_UP_TIME - fighter.tumble) / .42);
+    }
+  }
+
+  reactToVehicle({ npc, eta, speed, origin, velocity, halfWidth, outward }: NpcVehicleContact, dt: number): void {
+    if (this.isDown(npc.id)) return;
+    let fighter = this.fighters.get(npc.id);
+    if (eta <= dt) {
+      const damage = speed >= PEDESTRIAN_FATAL_SPEED ? MAX_PEDESTRIAN_HEALTH : Math.min(15, this.healthOf(npc.id) - 1);
+      this.hit(npc, damage, "vehicle");
+      const impacted = this.fighters.get(npc.id)!;
+      impacted.dodge = undefined;
+      impacted.launch = launchImpact(speed, velocity, outward);
+      npc.yaw = Math.atan2(impacted.launch.velocity.x, impacted.launch.velocity.z);
+      return;
+    }
+    // Only attempt a dodge when there's time to clear the projected bumper and room to land.
+    if (eta < .37 || fighter?.dodge || fighter?.vehiclePanic) return;
+    const from = npc.position;
+    const side = { x: -velocity.z / speed, z: velocity.x / speed };
+    const offset = (from.x - origin.x) * side.x + (from.z - origin.z) * side.z;
+    const preferred = offset >= 0 ? 1 : -1;
+    for (const sign of [preferred, -preferred]) {
+      const shift = sign * (halfWidth + .68) - offset;
+      if (Math.abs(shift) > 2.25) continue;
+      const to = { ...from, x: from.x + side.x * shift, z: from.z + side.z * shift };
+      const clearance = { ...to, x: to.x + side.x * sign * .3, z: to.z + side.z * sign * .3 };
+      if (!this.clearPath(from, clearance)) continue;
+      to.y = onSidewalk(to) ? .15 : -.01;
+      fighter ??= this.makeFighter("flee");
+      fighter.dodge = { from, to, elapsed: 0 };
+      fighter.swing = undefined;
+      fighter.vehiclePanic = true;
+      fighter.time = 2.5;
+      this.fighters.set(npc.id, fighter);
+      npc.yaw = direction(from, to);
+      break;
+    }
   }
 
   getPose(id: string): MeleePose | undefined {
@@ -85,7 +143,7 @@ export class MeleeSystem {
       const move = meleeMoves[swing.move];
       if (this.advanceSwing(swing, dt)) {
         const target = pedestrians.filter((npc) =>
-          this.healthOf(npc.id) > 0 && canTarget(npc.id) && this.inReach(this.player, npc, swing.move))
+          !this.isDown(npc.id) && canTarget(npc.id) && this.inReach(this.player, npc, swing.move))
           .sort((a, b) => distance(this.player.position, a.position) - distance(this.player.position, b.position))[0];
         if (target) this.hit(target, move.damage);
       }
@@ -109,14 +167,44 @@ export class MeleeSystem {
       }
       if (!fighter) continue;
       fighter.speed = 0;
+      if (fighter.launch) {
+        const { position, settled } = stepImpact(fighter.launch, npc.position, dt, this.clearPath, this.floorAt);
+        npc.position = position;
+        if (settled) {
+          fighter.launch = undefined;
+          if (fighter.health === 0) fighter.fallElapsed = FALL_DURATION;
+          else fighter.tumble = .36;
+        }
+        continue;
+      }
       if (fighter.health === 0) {
         fighter.fallElapsed = Math.min(FALL_DURATION, fighter.fallElapsed + dt);
+        continue;
+      }
+      if (fighter.tumble !== undefined) {
+        fighter.tumble += dt;
+        if (fighter.tumble >= GET_UP_TIME) fighter.tumble = undefined;
+        continue;
+      }
+      if (fighter.dodge) {
+        const { from, to } = fighter.dodge;
+        fighter.dodge.elapsed = Math.min(DODGE_TIME, fighter.dodge.elapsed + dt);
+        const t = fighter.dodge.elapsed / DODGE_TIME;
+        npc.position = { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t, z: from.z + (to.z - from.z) * t };
+        if (t === 1) fighter.dodge = undefined;
         continue;
       }
       fighter.stun = Math.max(0, fighter.stun - dt);
       fighter.cooldown = Math.max(0, fighter.cooldown - dt);
       fighter.time = Math.max(0, fighter.time - dt);
       if (fighter.stun > 0) continue;
+      if (fighter.vehiclePanic) {
+        if (fighter.time > 0) {
+          this.flee(npc, fighter, dt, true);
+          continue;
+        }
+        fighter.vehiclePanic = false;
+      }
       if (npc.definition.faction === "police" && !order) {
         fighter.swing = undefined;
         continue;
@@ -152,11 +240,7 @@ export class MeleeSystem {
       } else {
         fighter.swing = undefined;
         if (fighter.response === "flee" && fighter.time > 0) {
-          const away = direction(this.player.position, npc.position);
-          for (const offset of [0, .75, -.75, 1.5, -1.5]) {
-            fighter.speed = this.move(npc, away + offset, 5.3, dt);
-            if (fighter.speed) break;
-          }
+          this.flee(npc, fighter, dt);
         }
       }
     }
@@ -176,7 +260,7 @@ export class MeleeSystem {
     return Math.cos(direction(from.position, to.position) - from.yaw) > .35 && this.clearPath(from.position, to.position);
   }
 
-  private hit(target: Entity, damage: number): void {
+  private hit(target: Entity, damage: number, source?: "vehicle"): void {
     let fighter = this.fighters.get(target.id);
     if (!fighter) {
       const response = target.definition.faction !== "police" && this.random() < .5 ? "flee" : "fight";
@@ -186,11 +270,19 @@ export class MeleeSystem {
     fighter.health = Math.max(0, fighter.health - damage);
     fighter.swing = undefined;
     this.reportHit({ id: `strike-${++this.impactId}`, offenderId: this.player.id, victimId: target.id,
-      position: target.position, knockedOut: fighter.health === 0 });
+      position: target.position, knockedOut: fighter.health === 0, source });
     if (fighter.health > 0) {
-      fighter.stun = .3;
-      if (fighter.response === "flee") fighter.time = 4;
-      return;
+      if (source === "vehicle") {
+        fighter.tumble = 0;
+        fighter.dodge = undefined;
+        fighter.vehiclePanic = true;
+        fighter.time = 4;
+        fighter.stun = 0;
+      } else {
+        fighter.stun = .3;
+        if (fighter.response === "flee") fighter.time = 4;
+        return;
+      }
     }
     fighter.stun = 0;
     const from = target.position;
@@ -202,6 +294,14 @@ export class MeleeSystem {
         target.yaw = yaw;
         break;
       }
+    }
+  }
+
+  private flee(npc: Entity, fighter: Fighter, dt: number, fromVehicle = false): void {
+    const away = direction(this.player.position, npc.position);
+    for (const offset of [0, .75, -.75, Math.PI / 2, -Math.PI / 2]) {
+      fighter.speed = this.move(npc, away + offset, 5.3, dt, fromVehicle && !onSidewalk(npc.position));
+      if (fighter.speed) break;
     }
   }
 

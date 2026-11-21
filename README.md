@@ -55,6 +55,7 @@ To take a car, approach it while it's stopped or crawling and press **E** when p
 - A red health bar that starts at 100%. Fast traffic impacts on foot reduce health. At zero, **Start over** resets the run.
 - Ambient pedestrians may flee or fight back after being hit. Those who fight stay committed, even after taking a full combo. Their counterattacks reduce player health. Marla remains a dialogue-only NPC.
 - Ambient pedestrians have hidden health. When it reaches zero they collapse, stop fighting, and stay down.
+- Pedestrians try to dodge a player-driven car. On impact, they tumble away from the bumper and bounce before settling. A slower hit knocks them down briefly before they flee; fast impacts are fatal. Police respond to witnessed hits and treat fatal hits more seriously.
 - Knocked-out NPCs drop glowing cash bundles worth $1–$300. Nine out of ten drops are under $100. Walk over a bundle to add it to the HUD balance.
 
 No vehicle damage, audio, GLB assets, saves, or backend are shipped. Rapier’s compatibility package embeds WASM, so Vite can warn about the initial bundle size even when the build succeeds. See [Architecture](ARCHITECTURE.md) and [Game Design](GAME_DESIGN.md).

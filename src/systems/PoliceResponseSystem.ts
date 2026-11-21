@@ -75,7 +75,7 @@ export class PoliceResponseSystem {
     }
 
     const target = Math.min(policeConfig.maxResponders, policeConfig.response[this.wanted.level]);
-    const direct = this.incident?.kind === "police:assaulted"
+    const direct = this.incident?.kind === "police:assaulted" || this.incident?.kind === "police:vehicle_hit"
       ? officers.find(({ id }) => id === this.incident?.victimId) : undefined;
     if (target && direct && (!this.active.has(direct.id) || this.active.get(direct.id)?.phase === "return")) {
       this.recruit(direct, player);

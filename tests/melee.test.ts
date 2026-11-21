@@ -13,6 +13,34 @@ function setup(random: number, z = 11, clear = true) {
   return { npc, player, melee: new MeleeSystem(player, [npc], () => clear, () => random) };
 }
 
+it("dodges if there is time and room, but falls and recovers after a slow impact", () => {
+  const first = setup(.95);
+  const contact = { npc: first.npc, speed: 5, origin: { x: 12, y: 0, z: 15 }, velocity: { x: 0, y: 0, z: -5 }, halfWidth: .9, eta: .6 };
+  first.melee.reactToVehicle(contact, 1 / 60);
+  for (let i = 0; i < 12; i++) first.melee.step(1 / 60, false, false);
+  expect(first.melee.dodgeProgress(first.npc.id)).toBeGreaterThan(0);
+  expect(first.npc.position.x).toBeGreaterThan(12.8);
+  expect(first.melee.healthOf(first.npc.id)).toBe(MAX_PEDESTRIAN_HEALTH);
+
+  const second = setup(.95);
+  second.melee.reactToVehicle({ ...contact, npc: second.npc, eta: 0 }, 1 / 60);
+  expect(second.melee.isDown(second.npc.id)).toBe(true);
+  expect(second.melee.healthOf(second.npc.id)).toBe(45);
+  for (let i = 0; i < 110; i++) second.melee.step(1 / 60, false, false);
+  expect(second.melee.isDown(second.npc.id)).toBe(false);
+  expect(second.melee.reactionSpeed(second.npc.id)).toBeGreaterThan(0);
+});
+
+it("a fast impact removes all health even if a dodge was attempted", () => {
+  const { melee, npc } = setup(.95);
+  const contact = { npc, speed: 11, origin: { x: 12, y: 0, z: 15 }, velocity: { x: 0, y: 0, z: -11 }, halfWidth: .9, eta: 0 };
+  melee.reactToVehicle(contact, 1 / 60);
+  for (let i = 0; i < 90; i++) melee.step(1 / 60, false, false);
+  expect(melee.healthOf(npc.id)).toBe(0);
+  expect(melee.fallProgress(npc.id)).toBe(1);
+  expect(melee.reactionSpeed(npc.id)).toBe(0);
+});
+
 it("buffers two presses into a punch, punch, kick combo and resets after a break", () => {
   const { player, melee } = setup(0);
   const moves = new Set<number | undefined>();

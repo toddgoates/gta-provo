@@ -22,7 +22,7 @@ export class CrimeSystem {
       if (crimeRules[kind].direct) {
         const victim = dependencies.findEntity(incident.victimId);
         if (!victim?.enabled || victim.definition.faction !== "police" ||
-            (kind === "police:assaulted" && !dependencies.conscious(victim.id))) return;
+            ((kind === "police:assaulted" || kind === "police:vehicle_hit") && !dependencies.conscious(victim.id))) return;
       }
       this.seen.add(incident.id);
       const witnesses = dependencies.officers().filter((officer) => officer.enabled &&
@@ -36,10 +36,13 @@ export class CrimeSystem {
     for (const kind of Object.keys(crimeRules) as CrimeKind[]) {
       this.unsubscribe.push(events.on(kind, (incident) => observe(kind, incident)));
     }
-    this.unsubscribe.push(events.on("combat:hit", ({ knockedOut, ...incident }) => {
+    this.unsubscribe.push(events.on("combat:hit", ({ knockedOut, source, ...incident }) => {
       const victim = dependencies.findEntity(incident.victimId);
       if (!victim?.enabled || victim.definition.kind !== "npc") return;
-      const kind = victim.definition.faction === "police"
+      const kind = source === "vehicle" ? victim.definition.faction === "police"
+        ? knockedOut ? "police:vehicle_fatality" : "police:vehicle_hit"
+        : knockedOut ? "civilian:vehicle_fatality" : "civilian:vehicle_hit"
+        : victim.definition.faction === "police"
         ? knockedOut ? "police:knocked_out" : "police:assaulted"
         : knockedOut ? "civilian:knocked_out" : "civilian:assaulted";
       events.emit(kind, incident);

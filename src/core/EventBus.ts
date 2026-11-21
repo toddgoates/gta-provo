@@ -8,12 +8,16 @@ export interface CrimeIncident {
 }
 
 export interface GameEvents {
-  "combat:hit": CrimeIncident & { knockedOut: boolean };
+  "combat:hit": CrimeIncident & { knockedOut: boolean; source?: "vehicle" };
   "civilian:assaulted": CrimeIncident;
   "civilian:knocked_out": CrimeIncident;
   "police:assaulted": CrimeIncident;
   "police:knocked_out": CrimeIncident;
   "vehicle:stolen": CrimeIncident;
+  "civilian:vehicle_hit": CrimeIncident;
+  "civilian:vehicle_fatality": CrimeIncident;
+  "police:vehicle_hit": CrimeIncident;
+  "police:vehicle_fatality": CrimeIncident;
   "interaction:used": { entityId: string };
   "dialogue:completed": { dialogueId: string; npcId: string };
   "dialogue:choice": { dialogueId: string; choiceId: string };

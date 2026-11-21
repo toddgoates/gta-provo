@@ -27,6 +27,10 @@ export const crimeRules = {
   "police:assaulted": { minimum: 2, score: 2, direct: true },
   "police:knocked_out": { minimum: 3, score: 4, direct: true },
   "vehicle:stolen": { minimum: 1, score: 1, direct: false },
+  "civilian:vehicle_hit": { minimum: 1, score: 2, direct: false },
+  "civilian:vehicle_fatality": { minimum: 3, score: 6, direct: false },
+  "police:vehicle_hit": { minimum: 2, score: 4, direct: true },
+  "police:vehicle_fatality": { minimum: 3, score: 8, direct: true },
 } as const;
 
 export const reinforcementPoints: readonly Point[] = [

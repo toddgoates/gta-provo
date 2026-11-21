@@ -1,12 +1,27 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { EventBus } from "../core/EventBus";
-import type { Point } from "../entities/EntityManager";
+import type { Entity, Point } from "../entities/EntityManager";
 import type { DriverProfile } from "../entities/Appearance";
 import type { Crosswalk } from "./PedestrianSystem";
 import type { TrafficCar, TrafficSystem } from "./TrafficSystem";
 import { MIN_TRAFFIC_IMPACT_SPEED } from "./HealthSystem";
+import { WITHOUT_NPC_BODIES } from "./NpcColliders";
 
 export interface DriveInput { throttle: number; steer: number; brake: boolean }
+export const PEDESTRIAN_IMPACT_MIN = 2.25;
+export const PEDESTRIAN_FATAL_SPEED = 9;
+const DODGE_LOOKAHEAD = .65;
+const NPC_CAPSULE = new RAPIER.Capsule(.48, .30);
+
+export interface NpcVehicleContact {
+  npc: Entity;
+  eta: number;
+  speed: number;
+  origin: Point;
+  velocity: Point;
+  halfWidth: number;
+  outward?: Point;
+}
 const ENTRY_SPEED = 2.4;
 const EXIT_SPEED = 1.0;
 const QUERY = RAPIER.QueryFilterFlags.EXCLUDE_SENSORS;
@@ -75,7 +90,7 @@ export class VehicleSystem {
         Math.max(0, Math.abs(dx * Math.sin(yaw) + dz * Math.cos(yaw)) - length / 2));
       if (gap > 1.65 || result && result.gap <= gap) continue;
       const hit = this.world.castRay(new RAPIER.Ray(eye, { x: -dx, y: height * .55 - eye.y, z: -dz }),
-        1, true, QUERY, undefined, playerCollider);
+        1, true, QUERY, WITHOUT_NPC_BODIES, playerCollider);
       if (hit && hit.collider.handle !== this.bodies.get(car)!.collider.handle) continue;
       result = { car, gap };
     }
@@ -162,6 +177,35 @@ export class VehicleSystem {
     return strongest;
   }
 
+  /** Predict contact along actual player-car motion, never through a wall or another car. */
+  npcContacts(npcs: readonly Entity[], dt: number): NpcVehicleContact[] {
+    const car = this.seated;
+    if (!car) return [];
+    const { body, collider } = this.bodies.get(car)!;
+    const origin = body.translation();
+    const to = this.traffic.pose(car, 1);
+    const velocity = { x: (to.x - origin.x) / dt, y: 0, z: (to.z - origin.z) / dt };
+    const speed = Math.hypot(velocity.x, velocity.z);
+    if (speed < PEDESTRIAN_IMPACT_MIN) return [];
+    const limit = car.braking && car.speed === 0 ? dt : DODGE_LOOKAHEAD;
+    const contacts: NpcVehicleContact[] = [];
+    for (const npc of npcs) {
+      const dx = npc.position.x - origin.x, dz = npc.position.z - origin.z;
+      if (!npc.enabled || dx * velocity.x + dz * velocity.z < 0 ||
+        Math.hypot(dx, dz) > car.spawn.model.length / 2 + speed * limit + 1) continue;
+      const position = { ...npc.position, y: npc.position.y + .78 };
+      const hit = collider.castShape(velocity, NPC_CAPSULE, position, IDENTITY, { x: 0, y: 0, z: 0 }, .02, limit, true);
+      if (hit) {
+        const { yaw } = car.offRoute!.previous;
+        const normal = hit.normal1;
+        const outward = { x: normal.x * Math.cos(yaw) + normal.z * Math.sin(yaw), y: 0,
+          z: normal.z * Math.cos(yaw) - normal.x * Math.sin(yaw) };
+        contacts.push({ npc, eta: hit.time_of_impact, speed, origin, velocity, outward, halfWidth: car.spawn.model.width / 2 });
+      }
+    }
+    return contacts;
+  }
+
   dispose(): void {
     for (const { body } of this.bodies.values()) this.world.removeRigidBody(body);
     this.bodies.clear();
@@ -175,11 +219,11 @@ export class VehicleSystem {
     const yaw = pose.yaw + motion.turn;
     const origin = { x: pose.x, y: center, z: pose.z };
     // Check the rotated sweep as well as the translation so turning cannot clip a wall.
-    const safeYaw = this.world.intersectionWithShape(origin, rotation(yaw), sweep, QUERY, undefined, undefined, body)
+    const safeYaw = this.world.intersectionWithShape(origin, rotation(yaw), sweep, QUERY, WITHOUT_NPC_BODIES, undefined, body)
       ? pose.yaw : yaw;
     const delta = { x: -Math.sin(safeYaw) * motion.speed * dt, y: 0, z: -Math.cos(safeYaw) * motion.speed * dt };
     const hit = Math.abs(motion.speed) > .001 ? this.world.castShape(origin, rotation(safeYaw), delta, sweep, .025, 1,
-      false, QUERY, undefined, undefined, body) : null;
+      false, QUERY, WITHOUT_NPC_BODIES, undefined, body) : null;
     const fraction = hit?.time_of_impact ?? 1;
     state.previous = pose;
     state.pose = { x: pose.x + delta.x * fraction, z: pose.z + delta.z * fraction, yaw: safeYaw, turning: safeYaw !== pose.yaw };
