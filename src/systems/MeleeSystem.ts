@@ -56,6 +56,7 @@ export class MeleeSystem {
     private readonly random: () => number = Math.random,
     private readonly reportHit: (hit: CrimeIncident & { knockedOut: boolean; source?: "vehicle" }) => void = () => {},
     private readonly floorAt: (point: Point) => number = (point) => onSidewalk(point) ? .15 : -.01,
+    private readonly reportPlayerStrike: (landed: boolean) => void = () => {},
   ) {}
 
   get attacking(): boolean { return !!this.swing; }
@@ -146,6 +147,7 @@ export class MeleeSystem {
           !this.isDown(npc.id) && canTarget(npc.id) && this.inReach(this.player, npc, swing.move))
           .sort((a, b) => distance(this.player.position, a.position) - distance(this.player.position, b.position))[0];
         if (target) this.hit(target, move.damage);
+        this.reportPlayerStrike(!!target);
       }
       if (swing.elapsed >= move.duration) {
         this.swing = this.queued ? { move: (swing.move + 1) % meleeMoves.length, elapsed: 0 } : undefined;

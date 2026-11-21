@@ -1,6 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { downtown } from "../content/downtown";
-import { cashPickupPath, cityAmbiencePath, localAudioUrl } from "../content/audio";
+import { cashPickupPath, cityAmbiencePath, localAudioUrl, meleeHitPath, meleeMissPath } from "../content/audio";
 import { downtownPedestrians } from "../content/pedestrians";
 import { policeConfig, reinforcementLooks, reinforcementPoints } from "../content/police";
 import { createPedestrianLook } from "../content/characters/pedestrianLooks";
@@ -93,13 +93,19 @@ export class Game {
     this.movement = new MovementSystem(this.physics, this.player);
     this.npcColliders = new NpcColliders(this.physics);
     this.melee = new MeleeSystem(this.player, () => this.pedestrians.walkers.map(({ entity }) => entity),
-      (from, to) => this.clearSight(from, to, .88), Math.random, (hit) => this.events.emit("combat:hit", hit),
+      (from, to) => this.clearSight(from, to, .88), Math.random, (hit) => {
+        this.events.emit("combat:hit", hit);
+        if (hit.source === "vehicle") this.playPunchSound();
+      },
       (point) => {
         const ray = new RAPIER.Ray({ ...point, y: .55 }, { x: 0, y: -1, z: 0 });
         const ground = this.physics.castRay(ray, 1.5, true,
           RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
           WITHOUT_NPC_BODIES);
         return ground ? .55 - ground.timeOfImpact : -.01;
+      }, (landed) => {
+        if (landed) this.playPunchSound();
+        else this.audio.play({ url: localAudioUrl(meleeMissPath), channel: "sfx" });
       });
     this.view.addActor(this.player);
     this.view.addActor(this.npc);
@@ -298,11 +304,12 @@ export class Game {
     if (trafficHit || counterHit || fallHit) {
       if (this.health.depleted) {
         this.director.die();
-        this.audio.setPaused(true);
+        this.audio.stopAll();
         this.police.reset();
         this.input.clear();
         this.input.unlock();
       }
+      if (trafficHit) this.playPunchSound();
       this.publishHud();
       if (this.health.depleted) return;
     }
@@ -324,6 +331,10 @@ export class Game {
       this.publishHud();
     }
   };
+
+  private playPunchSound(): void {
+    this.audio.play({ url: localAudioUrl(meleeHitPath), channel: "sfx" });
+  }
 
   private clearSight(from: Point, to: Point, height: number, fixedOnly = false): boolean {
     const direction = { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z };

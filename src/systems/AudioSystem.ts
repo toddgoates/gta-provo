@@ -54,6 +54,10 @@ export class AudioSystem {
     for (const track of this.tracks) if (track.request.channel === channel) this.release(track);
   }
 
+  stopAll(): void {
+    for (const track of this.tracks) this.release(track);
+  }
+
   setPaused(paused: boolean): void {
     if (this.paused === paused || this.disposed) return;
     this.paused = paused;
@@ -80,7 +84,7 @@ export class AudioSystem {
   }
 
   dispose(): void {
-    for (const track of this.tracks) this.release(track);
+    this.stopAll();
     this.disposed = true;
   }
 

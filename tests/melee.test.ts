@@ -65,6 +65,22 @@ it("registers contact at impact and ignores targets behind the player or through
   }
 });
 
+it("reports exactly one hit or miss for each player strike at its impact frame", () => {
+  const { player, npc } = setup(.95);
+  const strikes: boolean[] = [];
+  const melee = new MeleeSystem(player, [npc], () => true, () => .95, undefined, undefined,
+    (landed) => strikes.push(landed));
+  melee.step(.1, true, true);
+  expect(strikes).toEqual([]);
+  melee.step(.1, false, true);
+  expect(strikes).toEqual([true]);
+  melee.step(.5, false, true);
+  npc.enabled = false;
+  melee.step(.25, true, true);
+  melee.step(.25, false, true);
+  expect(strikes).toEqual([true, false]);
+});
+
 it("causes fleeing or counterattacks, and counterattacks take player health", () => {
   const escape = setup(0);
   const attacker = setup(.95);
