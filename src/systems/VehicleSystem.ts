@@ -225,6 +225,12 @@ export class VehicleSystem {
     const hit = Math.abs(motion.speed) > .001 ? this.world.castShape(origin, rotation(safeYaw), delta, sweep, .025, 1,
       false, QUERY, WITHOUT_NPC_BODIES, undefined, body) : null;
     const fraction = hit?.time_of_impact ?? 1;
+    if (hit) {
+      const normal = hit.normal1;
+      const closingSpeed = -(delta.x * normal.x + delta.z * normal.z) / dt;
+      // A held accelerator against a wall only adds a fraction of a meter per second per tick.
+      if (closingSpeed >= 1.8) this.events?.emit("vehicle:crashed", { vehicleId: car.spawn.id, speed: closingSpeed });
+    }
     state.previous = pose;
     state.pose = { x: pose.x + delta.x * fraction, z: pose.z + delta.z * fraction, yaw: safeYaw, turning: safeYaw !== pose.yaw };
     car.speed = hit ? 0 : motion.speed;

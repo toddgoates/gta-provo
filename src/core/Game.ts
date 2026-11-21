@@ -1,6 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { downtown } from "../content/downtown";
-import { cashPickupPath, cityAmbiencePath, localAudioUrl, meleeHitPath, meleeMissPath } from "../content/audio";
+import { cashPickupPath, cityAmbiencePath, localAudioUrl, meleeHitPath, meleeMissPath, vehicleCrashPath } from "../content/audio";
 import { downtownPedestrians } from "../content/pedestrians";
 import { policeConfig, reinforcementLooks, reinforcementPoints } from "../content/police";
 import { createPedestrianLook } from "../content/characters/pedestrianLooks";
@@ -154,6 +154,9 @@ export class Game {
       import.meta.env.DEV ? () => { this.debug = !this.debug; this.publishHud(); } : undefined,
     );
     this.audio.play({ url: localAudioUrl(cityAmbiencePath), channel: "ambience", loop: true });
+    this.events.on("vehicle:crashed", () => {
+      this.audio.play({ url: localAudioUrl(vehicleCrashPath), channel: "sfx" });
+    });
     const unlockAudio = (event: Event) => { if (event.isTrusted) this.audio.unlock(); };
     const audioGesture = { signal: this.audioInput.signal, capture: true };
     window.addEventListener("pointerdown", unlockAudio, audioGesture);

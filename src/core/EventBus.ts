@@ -24,6 +24,7 @@ export interface GameEvents {
   "location:entered": { locationId: string };
   "vehicle:entered": { vehicleId: string };
   "vehicle:exited": { vehicleId: string };
+  "vehicle:crashed": { vehicleId: string; speed: number };
   "item:collected": { itemId: string };
   "item:delivered": { itemId: string; locationId: string };
   "world:flag-set": { flag: string; value: boolean };

@@ -69,4 +69,6 @@ Copy `chaching.mp3` to `public/audio/sfx/chaching.mp3`. It plays when you collec
 
 Copy `punch-1.mp3` and `swish-1.mp3` to `public/audio/sfx/`. The player’s melee strikes play the punch clip on contact and the swish clip on a miss. The punch clip also plays when a car damages the player or the player hits a pedestrian with a car.
 
+`public/audio/sfx/crash-1.mp3` plays when the car you're driving hits another vehicle or a solid object hard enough. NPCs still use the punch clip.
+
 For future voice lines, put files in `public/audio/dialogue/` and set the dialogue node's `audio` field to a path relative to `public/`, for example `audio/dialogue/marla-hello.mp3`. Conversations lower ambience and music, even when a line is text-only. Music and sound effects can play alongside ambience. Pausing the game pauses all channels; resuming continues playback.

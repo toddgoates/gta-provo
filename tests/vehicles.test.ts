@@ -9,6 +9,7 @@ import { EntityManager } from "../src/entities/EntityManager";
 import { MovementSystem } from "../src/systems/MovementSystem";
 import { TrafficSystem } from "../src/systems/TrafficSystem";
 import { driveMotion, VehicleSystem } from "../src/systems/VehicleSystem";
+import { NpcColliders } from "../src/systems/NpcColliders";
 
 const neutral = { throttle: 0, steer: 0, brake: false };
 beforeAll(async () => { await RAPIER.init(); });
@@ -90,11 +91,14 @@ it("boards only a nearby slow car, ejects its driver once, and parks beside a cl
   }
 });
 
-it("sweeps the player's car against a wall instead of driving through it", () => {
+it("stops the car at a wall and reports one crash even if the accelerator stays held", () => {
   const world = new RAPIER.World({ x: 0, y: 0, z: 0 });
   world.timestep = FIXED_DT;
   const traffic = new TrafficSystem([downtownTraffic[0]]);
-  const vehicles = new VehicleSystem(world, traffic);
+  const events = new EventBus();
+  const speeds: number[] = [];
+  events.on("vehicle:crashed", ({ speed }) => speeds.push(speed));
+  const vehicles = new VehicleSystem(world, traffic, events);
   const [car] = traffic.cars;
   const start = traffic.pose(car, 1);
   const wall = start.x + 5;
@@ -110,6 +114,8 @@ it("sweeps the player's car against a wall instead of driving through it", () =>
     expect(front).toBeGreaterThan(wall - .5);
     expect(front).toBeLessThan(wall - .29);
     expect(car.speed).toBe(0);
+    expect(speeds).toHaveLength(1);
+    expect(speeds[0]).toBeGreaterThan(1.8);
   } finally {
     vehicles.dispose();
     world.free();
@@ -120,7 +126,11 @@ it("predicts a player-car impact and excludes a pedestrian safely outside the bu
   const world = new RAPIER.World({ x: 0, y: 0, z: 0 });
   world.timestep = FIXED_DT;
   const traffic = new TrafficSystem([downtownTraffic[0]]);
-  const vehicles = new VehicleSystem(world, traffic);
+  const events = new EventBus();
+  const crashes: string[] = [];
+  events.on("vehicle:crashed", ({ vehicleId }) => crashes.push(vehicleId));
+  const vehicles = new VehicleSystem(world, traffic, events);
+  const npcs = new NpcColliders(world);
   const entities = new EntityManager();
   try {
     world.step();
@@ -129,13 +139,17 @@ it("predicts a player-car impact and excludes a pedestrian safely outside the bu
     const { x, z } = traffic.pose(car, 1);
     const near = entities.spawn("near", playerDefinition, { x: x + car.spawn.model.length / 2 + .32, y: 0, z });
     const clear = entities.spawn("clear", playerDefinition, { ...near.position, z: z + 2.7 });
+    npcs.sync([near, clear]);
+    world.step();
     vehicles.enter(car, { x, y: 0, z: z + 2 });
     car.speed = 5;
     vehicles.step(FIXED_DT, neutral);
     const contacts = vehicles.npcContacts([near, clear], FIXED_DT);
     expect(contacts.map(({ npc }) => npc.id)).toEqual([near.id]);
     expect(contacts[0].eta).toBeLessThan(FIXED_DT);
+    expect(crashes).toEqual([]);
   } finally {
+    npcs.dispose();
     vehicles.dispose();
     world.free();
   }
