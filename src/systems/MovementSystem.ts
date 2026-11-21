@@ -12,6 +12,7 @@ export class MovementSystem {
   private controller: RAPIER.KinematicCharacterController;
   private vertical = 0;
   private grounded = false;
+  private airPeak: number | null = null;
   previous: Point;
   speed = 0;
 
@@ -44,15 +45,25 @@ export class MovementSystem {
     return delta;
   }
 
-  commit(dt: number): void {
+  /** Returns the drop from the airborne high point, once on landing. */
+  commit(dt: number): number {
     const { x, y, z } = this.body.translation();
     this.previous = this.player.position;
     this.player.position = { x, y: y - CENTER, z };
     this.speed = Math.hypot(x - this.previous.x, z - this.previous.z) / dt;
+    const feet = this.player.position.y;
+    if (!this.grounded) {
+      this.airPeak = Math.max(this.airPeak ?? this.previous.y, feet);
+      return 0;
+    }
+    const drop = this.airPeak === null ? 0 : Math.max(0, this.airPeak - feet);
+    this.airPeak = null;
+    return drop;
   }
 
   board(): void {
     this.collider.setEnabled(false);
+    this.airPeak = null;
     this.speed = 0;
   }
 
@@ -67,6 +78,7 @@ export class MovementSystem {
     this.previous = position;
     this.vertical = 0;
     this.grounded = false;
+    this.airPeak = null;
   }
 
   dispose(): void {

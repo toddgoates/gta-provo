@@ -1,6 +1,8 @@
 export const MAX_HEALTH = 100;
 export const MIN_TRAFFIC_IMPACT_SPEED = 4.5;
 const HIT_COOLDOWN = .9;
+const SAFE_FALL = 2.5;
+const FALL_DAMAGE_PER_METER = 10;
 
 export class HealthSystem {
   private remaining = MAX_HEALTH;
@@ -21,6 +23,14 @@ export class HealthSystem {
 
   applyMeleeHit(damage: number): boolean {
     return this.applyDamage(damage, .46);
+  }
+
+  applyFall(drop: number): boolean {
+    const damage = Math.round((drop - SAFE_FALL) * FALL_DAMAGE_PER_METER);
+    // Contact invulnerability should not let the player survive an otherwise fatal fall.
+    if (this.depleted || !(damage > 0)) return false;
+    this.remaining = Math.max(0, this.remaining - damage);
+    return true;
   }
 
   private applyDamage(damage: number, cooldown: number): boolean {

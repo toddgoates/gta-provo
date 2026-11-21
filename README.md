@@ -46,6 +46,7 @@ To take a car, approach it while it's stopped or crawling and press **E** when p
 
 - Three developed blocks and a public plaza with storefronts, crosswalks, trees, and a Wasatch-inspired skyline.
 - Fixed-step Rapier capsule movement with gravity, curb stepping, jumping, and building collision; a follow camera with wall obstruction.
+- Walk up the exterior stairs on the east side of Soda Dept. to reach its roof. Normal jumps are safe; higher falls do more damage.
 - Six low-poly NPC cars in three body styles. They keep right, brake behind other cars, take turns at the four-way stop, and yield to the player.
 - Thirteen pedestrians in a mix of solo walkers, pairs, and small groups. Some stand and chat; walkers stay on sidewalks and use marked crosswalks when traffic clears.
 - Take over a slow or stopped car, watch one of six distinct drivers tumble out and flee, and drive with an arcade chase camera.

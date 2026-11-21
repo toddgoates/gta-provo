@@ -123,10 +123,10 @@ export class WorldManager {
     this.root.add(mesh, back);
   }
 
-  private building({ x, z, width: w, depth: d, height: h, color, front, sign, accent = 0x6a5a60 }: BuildingLot): void {
+  private building({ x, z, width: w, depth: d, height: h, color, front, sign, accent = 0x6a5a60, roofStairs }: BuildingLot): void {
     const face = z + front * (d / 2 + .04);
     this.box(x, h / 2 + .15, z, w, h, d, color, true);
-    this.box(x, h + .16, z, w + .36, .28, d + .36, accent);
+    this.box(x, h + .16, z, w + .36, .28, d + .36, accent, !!roofStairs);
     this.box(x + w * .21, h + .61, z - 1.8, w * .24, .76, d * .25, 0x8a8588);
     this.box(x, .56, face + front * .06, w, .8, .17, accent);
     this.box(x, 1.52, face, 1.65, 2.76, .18, 0x354957);
@@ -149,6 +149,53 @@ export class WorldManager {
       this.box(x, 3.04, face + front * .45, w * .68, .19, 1.22, accent);
       this.sign(sign, x, 3.85, face + front * .15, w * .69, front, accent);
     }
+    if (roofStairs) this.roofStairway(x + w / 2, h + .30, roofStairs);
+  }
+
+  private roofStairway(wallX: number, roof: number, { baseZ, run, width }: NonNullable<BuildingLot["roofStairs"]>): void {
+    const base = .15;
+    const rise = roof - base;
+    const x = wallX + width / 2;
+    const endZ = baseZ + run;
+    const rail = 0x414950;
+    const tread = 0x687474;
+    const steps = Math.ceil(rise / .21);
+    const depth = run / steps;
+    // Render individual treads, but use one sloped collision surface to avoid snagging on risers.
+    for (let i = 0; i < steps; i++) {
+      const y = base + rise * (i + 1) / steps;
+      const z = baseZ + depth * (i + .5);
+      this.box(x, y - .065, z, width, .13, depth + .025, tread);
+      this.box(x, y - .015, z - depth / 2 + .026, width, .03, .06, 0xbfaa83);
+    }
+    const angle = Math.atan2(rise, run);
+    const span = Math.hypot(rise, run);
+    const rotatedBox = (cx: number, top: number, w: number, thickness: number, color: number, visible: boolean) => {
+      const y = top - thickness * .5 * Math.cos(angle);
+      const z = baseZ + run / 2 + thickness * .5 * Math.sin(angle);
+      this.colliders.push(this.physics.createCollider(RAPIER.ColliderDesc.cuboid(w / 2, thickness / 2, span / 2)
+        .setTranslation(cx, y, z).setRotation({ x: -Math.sin(angle / 2), y: 0, z: 0, w: Math.cos(angle / 2) })));
+      if (!visible) return;
+      const mesh = new THREE.Mesh(this.cube, this.mat(color));
+      mesh.position.set(cx, y, z);
+      mesh.scale.set(w, thickness, span);
+      mesh.rotation.x = -angle;
+      this.root.add(mesh);
+    };
+    rotatedBox(x, (base + roof) / 2, width, .23, tread, false);
+    const outer = wallX + width;
+    rotatedBox(outer, (base + roof) / 2 + 1.04, .095, .09, rail, true);
+    rotatedBox(outer, (base + roof) / 2 + .57, .09, .09, rail, true);
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10;
+      this.box(outer, base + rise * t + .51, baseZ + run * t, .092, 1.02, .092, rail);
+    }
+    this.box(x - .42, roof - .11, endZ + .98, width + .84, .22, 2.03, tread, true);
+    this.box(outer, roof + .5, endZ + .98, .095, 1, 2.03, rail, true);
+    this.box(x - .42, roof + .5, endZ + 1.98, width + .84, 1, .095, rail, true);
+    this.box(x, roof / 2, endZ + 1.46, .16, roof, .16, rail);
+    this.sign("ROOF ACCESS ↑", outer + .64, 1.18, baseZ - .13, 1.65, -1, 0x344951);
+    this.box(outer + .64, .63, baseZ - .1, .07, 1.26, .07, rail);
   }
 
   private sign(text: string, x: number, y: number, z: number, width: number, front: number, accent: number): void {

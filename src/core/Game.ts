@@ -275,12 +275,14 @@ export class Game {
       return;
     }
     if (!policy.walk) return;
-    this.movement.commit(dt);
+    const landed = this.movement.commit(dt);
     const counterDamage = this.melee.step(dt, strike, true, (id) => !this.pedestrians.isCrossing(id),
       this.police.step(dt, this.player.position));
     const counterHit = this.health.applyMeleeHit(counterDamage);
     if (counterHit) this.melee.playerHit();
-    if (this.health.applyTrafficImpact(impact) || counterHit) {
+    const trafficHit = this.health.applyTrafficImpact(impact);
+    const fallHit = this.health.applyFall(landed);
+    if (trafficHit || counterHit || fallHit) {
       if (this.health.depleted) {
         this.director.die();
         this.police.reset();

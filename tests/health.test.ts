@@ -33,3 +33,14 @@ it("clamps lethal damage to zero and keeps death mode frozen until a new session
   expect(director.setFreeMode("exploration")).toBe(false);
   expect(new HealthSystem().value).toBe(100);
 });
+
+it("scales fall damage by vertical drop, ignores normal jumps, and can be lethal", () => {
+  const health = new HealthSystem();
+  expect(health.applyFall(1.5)).toBe(false);
+  expect(health.applyFall(4)).toBe(true);
+  expect(health.value).toBe(85);
+  expect(health.applyFall(8)).toBe(true);
+  expect(health.value).toBe(30);
+  expect(health.applyFall(14)).toBe(true);
+  expect(health.depleted).toBe(true);
+});
