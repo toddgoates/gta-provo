@@ -29,6 +29,7 @@ import { TrafficSystem } from "../systems/TrafficSystem";
 import { PedestrianSystem } from "../systems/PedestrianSystem";
 import type { TrafficCar } from "../systems/TrafficSystem";
 import { VehicleSystem } from "../systems/VehicleSystem";
+import type { VehicleExit } from "../systems/VehicleSystem";
 import { equipGarment } from "../systems/WardrobeSystem";
 import type { HudSnapshot } from "../ui/hudStore";
 import { WorldManager } from "../world/WorldManager";
@@ -38,6 +39,7 @@ import { FIXED_DT, GameLoop } from "./GameLoop";
 import { InputManager } from "./InputManager";
 
 let rapierReady: Promise<void> | undefined;
+const PULL_RECOVERY = .78;
 
 export class Game {
   private events = new EventBus();
@@ -71,6 +73,8 @@ export class Game {
   private loop: GameLoop;
   private candidate: Entity | null = null;
   private carCandidate: TrafficCar | null = null;
+  private pullAttempt?: { id: string; elapsed: number };
+  private pulledOut?: { officerId: string; origin: Point; remaining: number };
   private cash = new CashSystem(this.events, this.player.id);
   private missionReward = 0;
   private complete = false;
@@ -237,8 +241,12 @@ export class Game {
   private advance = (dt: number): void => {
     const { policy } = this.director;
     this.health.step(dt);
-    const strike = this.input.takeAttack() && policy.walk;
-    const attackSpeed = this.melee.attacking || strike ? .28 : 1;
+    if (this.pulledOut) {
+      this.pulledOut.remaining -= dt;
+      if (this.pulledOut.remaining <= 0) this.pulledOut = undefined;
+    }
+    const strike = this.input.takeAttack() && policy.walk && !this.pulledOut;
+    const attackSpeed = this.pulledOut ? 0 : this.melee.attacking || strike ? .28 : 1;
     let walkDelta: Point | undefined;
     if (policy.walk) {
       this.view.rig.look(...this.input.takeLook());
@@ -282,17 +290,31 @@ export class Game {
       const { x, z, yaw } = this.traffic.pose(occupied, 1);
       this.player.position = { x, y: 0, z };
       this.player.yaw = yaw;
-      this.melee.step(dt, false, false, undefined, this.police.step(dt, this.player.position));
+      const orders = this.police.step(dt, this.player.position, (officer) => this.vehicles.pursuitDoor(officer));
+      this.melee.step(dt, false, false, undefined, orders);
+      const officer = [...orders].flatMap(([id, order]) => {
+        const npc = this.entities.get(id);
+        return order.attack && npc?.definition.faction === "police" && !this.melee.isDown(id) &&
+          !this.melee.getPose(id)?.flinch && this.melee.dodgeProgress(id) === 0 && this.vehicles.canPullOut(npc.position) &&
+          this.clearSight(npc.position, this.player.position, 1.15) ? [npc] : [];
+      })[0];
+      if (!officer) this.pullAttempt = undefined;
+      else {
+        if (this.pullAttempt?.id !== officer.id) this.pullAttempt = { id: officer.id, elapsed: 0 };
+        this.pullAttempt.elapsed += dt;
+        if (this.pullAttempt.elapsed >= .23) {
+          const exit = this.vehicles.exit(officer.position);
+          if (exit) {
+            this.pulledOut = { officerId: officer.id, origin: this.player.position, remaining: PULL_RECOVERY };
+            this.finishVehicleExit(exit);
+            return;
+          }
+          this.pullAttempt.elapsed = 0;
+        }
+      }
       if (this.vehicles.exitRequested) {
         const exit = this.vehicles.exit();
-        if (exit) {
-          this.movement.disembark(exit.point, exit.yaw);
-          this.view.rig.heading = exit.yaw;
-          this.director.setFreeMode("exploration");
-          this.input.clear();
-          this.events.emit("vehicle:exited", { vehicleId: exit.car.spawn.id });
-          this.publishHud();
-        }
+        if (exit) this.finishVehicleExit(exit);
       }
       return;
     }
@@ -323,7 +345,7 @@ export class Game {
     this.triggers.update(this.player.position);
     this.candidate = this.interaction.nearest(this.player.position, this.entities.all());
     this.carCandidate = this.vehicles.nearest(this.player.position, this.movement.collider)?.car ?? null;
-    if (!use || this.melee.attacking) return;
+    if (!use || this.melee.attacking || this.pulledOut) return;
     if (this.candidate) this.interaction.use(this.candidate);
     else if (this.carCandidate && this.director.setFreeMode("driving")) {
       this.vehicles.enter(this.carCandidate, this.player.position, this.player.id);
@@ -334,6 +356,16 @@ export class Game {
       this.publishHud();
     }
   };
+
+  private finishVehicleExit(exit: VehicleExit): void {
+    this.pullAttempt = undefined;
+    this.movement.disembark(exit.point, exit.yaw);
+    this.view.rig.heading = exit.yaw;
+    this.director.setFreeMode("exploration");
+    this.input.clear();
+    this.events.emit("vehicle:exited", { vehicleId: exit.car.spawn.id });
+    this.publishHud();
+  }
 
   private playPunchSound(): void {
     this.audio.play({ url: localAudioUrl(meleeHitPath), channel: "sfx" });
@@ -376,11 +408,12 @@ export class Game {
       this.view.rig.update(dt, vehiclePose ? { ...vehiclePose, y: 0 } : interpolated, focus, this.castCameraRay, vehiclePose?.yaw);
     }
     this.view.updateTraffic(this.traffic, alpha);
-    this.view.updatePedestrians(this.pedestrians.walkers, alpha, this.melee);
+    const pull = this.pulledOut && { ...this.pulledOut, progress: 1 - this.pulledOut.remaining / PULL_RECOVERY };
+    this.view.updatePedestrians(this.pedestrians.walkers, alpha, this.melee, pull);
     this.view.updateDrivers(this.vehicles.drivers);
     this.view.updateCash(this.cash.pickups);
     this.view.render(this.player, interpolated, walk ? this.movement.speed : 0, this.goal,
-      camera === "hold" ? 0 : dt, !!occupied, this.melee.getPose(this.player.id));
+      camera === "hold" ? 0 : dt, !!occupied, this.melee.getPose(this.player.id), pull);
     if (import.meta.env.DEV && dt > 0) this.fps += (1 / dt - this.fps) * .09;
     this.hudElapsed += dt;
     if (this.hudElapsed >= .1) this.publishHud();
@@ -415,7 +448,8 @@ export class Game {
       wanted: this.wanted.level,
       mission: current && { title: current.mission.title, objective: current.objective.text },
       dialogue: this.dialogue.view,
-      prompt: this.director.policy.interact ? this.candidate?.definition.interaction?.prompt ??
+      pulledOut: !!this.pulledOut,
+      prompt: this.director.policy.interact && !this.pulledOut ? this.candidate?.definition.interaction?.prompt ??
         (this.carCandidate ? this.carCandidate.offRoute ? "Get in car" : "Take car" : null) : null,
       driving: this.vehicles.occupied ? { speed: Math.round(Math.abs(this.vehicles.occupied.speed) * 2.237),
         exiting: this.vehicles.exitRequested, blocked: this.vehicles.exitBlocked } : null,

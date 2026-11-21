@@ -30,6 +30,8 @@ Two officers patrol on foot. A civilian assault or vehicle theft only earns a wa
 
 Levels 1–3 call for 1, 2, and 4 responding officers respectively; levels 4–5 currently use the four-officer fallback. The development-only **F1** panel shows responders, visibility, and the decay timer, with controls for all five levels.
 
+Pursuing officers can pull you out of a stopped or slow-moving car if they reach a door and have a clear place to put you. The pursuit continues on foot afterward.
+
 To take a car, approach it while it's stopped or crawling and press **E** when prompted. In the car, **W** accelerates, **A/D** steer, **S** brakes then reverses, and **Space** brakes without reversing. Press **E** to stop and get out. If the exit is blocked, move the car and try again.
 
 ## Commands

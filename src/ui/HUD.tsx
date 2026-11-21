@@ -94,6 +94,7 @@ export function HUD({ pause, advance, restart, setWanted }: {
           </section>}
           <DistrictMap {...hud} />
           {hud.prompt && <div className="interaction panel"><kbd>E</kbd> {hud.prompt}</div>}
+          {hud.pulledOut && <div className="interaction panel" role="status">Police pulled you out!</div>}
           {hud.driving && <div className="interaction panel" role="status">
             {hud.driving.exiting ? "Stopping to get out…" : hud.driving.blocked ? "Exit blocked. Move the car to a clear spot." :
               <><kbd>E</kbd> Exit car <span className="driving-speed">{hud.driving.speed} mph</span></>}

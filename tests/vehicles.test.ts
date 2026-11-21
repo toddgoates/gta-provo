@@ -122,6 +122,38 @@ it("stops the car at a wall and reports one crash even if the accelerator stays 
   }
 });
 
+it("allows a beside-the-door pull-out at low speed but not from far away or at speed", () => {
+  const world = new RAPIER.World({ x: 0, y: 0, z: 0 });
+  const traffic = new TrafficSystem([downtownTraffic[0]]);
+  const vehicles = new VehicleSystem(world, traffic);
+  const bodies = new NpcColliders(world);
+  try {
+    world.createCollider(RAPIER.ColliderDesc.cuboid(65, .5, 45).setTranslation(0, -.5, 0));
+    const [car] = traffic.cars;
+    const start = traffic.pose(car, 1);
+    vehicles.enter(car, { x: start.x, y: 0, z: start.z + 3 });
+    const far = { x: start.x, y: 0, z: start.z + 5 };
+    const officer = vehicles.pursuitDoor(far)!;
+    bodies.sync([{ id: "officer", position: officer }]);
+    world.step();
+    expect(vehicles.exit(far)).toBeNull();
+    car.speed = -5;
+    expect(vehicles.exit(officer)).toBeNull();
+    car.speed = 1.9;
+    expect(vehicles.exit()).toBeNull(); // Still above the normal manual exit threshold.
+    const exit = vehicles.exit(officer)!;
+    expect(exit.car).toBe(car);
+    expect(exit.point.z).toBeGreaterThan(start.z);
+    expect(Math.hypot(exit.point.x - officer.x, exit.point.z - officer.z)).toBeGreaterThan(.65);
+    expect(vehicles.occupied).toBeUndefined();
+    expect(car.speed).toBe(0);
+  } finally {
+    bodies.dispose();
+    vehicles.dispose();
+    world.free();
+  }
+});
+
 it("predicts a player-car impact and excludes a pedestrian safely outside the bumper", () => {
   const world = new RAPIER.World({ x: 0, y: 0, z: 0 });
   world.timestep = FIXED_DT;

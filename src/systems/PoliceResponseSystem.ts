@@ -54,7 +54,7 @@ export class PoliceResponseSystem {
     }
   }
 
-  step(dt: number, player: Point): ReadonlyMap<string, OfficerOrder> {
+  step(dt: number, player: Point, approachVehicle?: (officer: Point) => Point | undefined): ReadonlyMap<string, OfficerOrder> {
     const orders = new Map<string, OfficerOrder>();
     const officers = this.world.officers().filter(({ id, enabled }) => enabled && this.world.active(id));
     const seeing = new Set(this.wanted.level ? officers.filter(({ position }) =>
@@ -133,7 +133,9 @@ export class PoliceResponseSystem {
       const attack = response.phase === "pursue";
       let goal = response.phase === "return" ? response.anchor : response.lastKnown;
       if (response.phase === "standby") goal = officer.position;
-      if (attack && distance(officer.position, player) < 4.5 && crowd.length > 1) {
+      if (attack && approachVehicle) {
+        goal = approachVehicle(officer.position) ?? goal;
+      } else if (attack && distance(officer.position, player) < 4.5 && crowd.length > 1) {
         const angle = index * 2.4;
         const flank = { x: player.x + Math.cos(angle) * .92, y: player.y, z: player.z + Math.sin(angle) * .92 };
         if (this.world.clearRoute(officer.position, flank)) goal = flank;

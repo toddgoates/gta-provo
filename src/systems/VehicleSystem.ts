@@ -22,8 +22,10 @@ export interface NpcVehicleContact {
   halfWidth: number;
   outward?: Point;
 }
+export interface VehicleExit { car: TrafficCar; point: Point; yaw: number }
 const ENTRY_SPEED = 2.4;
 const EXIT_SPEED = 1.0;
+const PULL_OUT_SPEED = 2.4;
 const QUERY = RAPIER.QueryFilterFlags.EXCLUDE_SENSORS;
 const rotation = (yaw: number) => ({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) });
 const IDENTITY = rotation(0);
@@ -117,15 +119,36 @@ export class VehicleSystem {
     this.exitBlocked = false;
   }
 
-  exit(): { car: TrafficCar; point: Point; yaw: number } | null {
+  pursuitDoor(officer: Point): Point | undefined {
+    if (!this.seated) return;
+    const { x, z, yaw } = this.traffic.pose(this.seated, 1);
+    const cos = Math.cos(yaw), sin = Math.sin(yaw);
+    const side = (officer.x - x) * cos - (officer.z - z) * sin >= 0 ? 1 : -1;
+    const gap = side * (this.seated.spawn.model.width / 2 + .72);
+    return { x: x + cos * gap, y: 0, z: z - sin * gap };
+  }
+
+  canPullOut(officer: Point): boolean {
     const car = this.seated;
-    if (!car || Math.abs(car.speed) > EXIT_SPEED) return null;
+    const door = this.pursuitDoor(officer);
+    return !!car && !!door && Math.abs(car.speed) <= PULL_OUT_SPEED && Math.abs(officer.y) <= .65 &&
+      Math.hypot(officer.x - door.x, officer.z - door.z) < .9;
+  }
+
+  exit(officer?: Point): VehicleExit | null {
+    const car = this.seated;
+    if (!car || (officer ? !this.canPullOut(officer) : Math.abs(car.speed) > EXIT_SPEED)) return null;
     const { x, z, yaw } = this.traffic.pose(car, 1);
     const { width, length } = car.spawn.model;
     const capsule = new RAPIER.Capsule(.48, .34);
     // Try beside either door, then behind the bumper. Reject floors outside a reasonable step.
     const side = width / 2 + .62;
-    for (const [localX, localZ] of [[-side, 0], [side, 0], [0, length / 2 + .64]]) {
+    const lateral = officer && ((officer.x - x) * Math.cos(yaw) - (officer.z - z) * Math.sin(yaw) >= 0 ? side : -side);
+    const longitudinal = officer && ((officer.x - x) * Math.sin(yaw) + (officer.z - z) * Math.cos(yaw) >= 0 ? -1 : 1);
+    const exits = lateral && longitudinal
+      ? [[lateral, longitudinal * .98], [lateral, -longitudinal * 1.16], [lateral * 1.22, longitudinal * 1.35]]
+      : [[-side, 0], [side, 0], [0, length / 2 + .64]];
+    for (const [localX, localZ] of exits) {
       const px = x + localX * Math.cos(yaw) + localZ * Math.sin(yaw);
       const pz = z - localX * Math.sin(yaw) + localZ * Math.cos(yaw);
       const ground = this.world.castRay(new RAPIER.Ray({ x: px, y: .61, z: pz }, { x: 0, y: -1, z: 0 }),
@@ -141,8 +164,10 @@ export class VehicleSystem {
       car.offRoute!.previous = car.offRoute!.pose;
       return { car, point, yaw };
     }
-    this.exitRequested = false;
-    this.exitBlocked = true;
+    if (!officer) {
+      this.exitRequested = false;
+      this.exitBlocked = true;
+    }
     return null;
   }
 

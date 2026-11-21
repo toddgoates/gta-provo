@@ -128,7 +128,8 @@ export class GameView {
     }
   }
 
-  updatePedestrians(walkers: readonly Pedestrian[], alpha: number, melee: MeleeSystem): void {
+  updatePedestrians(walkers: readonly Pedestrian[], alpha: number, melee: MeleeSystem,
+    pull?: { officerId: string; progress: number; origin: Point }): void {
     for (const { entity, previous, phase, speed: walkSpeed } of walkers) {
       const speed = melee.hasReactor(entity.id) ? melee.reactionSpeed(entity.id) : walkSpeed;
       const view = this.actors.get(entity.id)!.view;
@@ -165,6 +166,14 @@ export class GameView {
       view.group.position.y += dodge * .38;
       poseCharacter(view, Math.sin(this.time * (speed > 4 ? 13 : speed > 2 ? 9 : 7) + phase) * Math.min(.66, speed * .175),
         melee.getPose(entity.id));
+      if (pull?.officerId === entity.id && pull.progress < .38) {
+        const tug = Math.sin(Math.PI * pull.progress / .38);
+        view.group.rotation.y = Math.atan2(x - pull.origin.x, z - pull.origin.z);
+        view.torso.rotation.x -= tug * .27;
+        view.limbs[1].rotation.x = tug * 1.24;
+        view.limbs[3].rotation.x = tug * 1.36;
+        view.joints[3].rotation.x = tug * .44;
+      }
       if (dodge > 0) {
         view.limbs[0].rotation.x = .52 * dodge;
         view.joints[0].rotation.x = -.77 * dodge;
@@ -187,7 +196,8 @@ export class GameView {
     this.scene.add(stain);
   }
 
-  render(player: Entity, position: Point, speed: number, goal: Point | undefined, dt: number, seated = false, melee?: MeleePose): void {
+  render(player: Entity, position: Point, speed: number, goal: Point | undefined, dt: number, seated = false,
+    melee?: MeleePose, pull?: { progress: number; origin: Point }): void {
     this.time += dt;
     for (const { entity, view } of this.actors.values()) {
       if (entity.wardrobe) view.updateWardrobe(entity.wardrobe);
@@ -195,9 +205,21 @@ export class GameView {
     const actor = this.actors.get(player.id)!.view;
     actor.group.visible = !seated;
     actor.group.position.set(position.x, position.y, position.z);
-    actor.group.rotation.y = player.yaw;
+    actor.group.rotation.set(0, player.yaw, 0, "YXZ");
     const stride = Math.sin(this.time * (speed > 6 ? 14 : 10)) * Math.min(.65, speed * .085);
     poseCharacter(actor, stride, melee);
+    if (pull) {
+      const t = pull.progress;
+      const outward = Math.min(1, .28 + 2.65 * t);
+      const fall = Math.min(1, t / .28, (1 - t) / .45);
+      actor.group.position.set(pull.origin.x + (position.x - pull.origin.x) * outward,
+        position.y + .21 * fall + .41 * (1 - outward), pull.origin.z + (position.z - pull.origin.z) * outward);
+      actor.group.rotation.y = Math.atan2(position.x - pull.origin.x, position.z - pull.origin.z);
+      actor.group.rotation.x = fall * 1.48;
+      actor.limbs[1].rotation.z = -.7 * fall;
+      actor.limbs[3].rotation.z = .75 * fall;
+      actor.joints[0].rotation.x = -.42 * fall;
+    }
     const onBlock = Math.abs(position.x) > 9.2 && Math.abs(position.z) > 9.2;
     this.shadow.position.set(position.x, onBlock ? .163 : .004, position.z);
     this.shadow.visible = !seated;
