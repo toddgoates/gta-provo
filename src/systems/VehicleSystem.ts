@@ -6,6 +6,7 @@ import type { Crosswalk } from "./PedestrianSystem";
 import type { TrafficCar, TrafficSystem } from "./TrafficSystem";
 import { MIN_TRAFFIC_IMPACT_SPEED } from "./HealthSystem";
 import { WITHOUT_NPC_BODIES } from "./NpcColliders";
+import { collisionDamage, MAX_VEHICLE_DAMAGE } from "./VehicleDamage";
 
 export interface DriveInput { throttle: number; steer: number; brake: boolean }
 export const PEDESTRIAN_IMPACT_MIN = 2.25;
@@ -57,6 +58,7 @@ interface Driver extends FleeingDriver { age: number; dx: number; dz: number }
 export class VehicleSystem {
   private bodies = new Map<TrafficCar, CarBody>();
   private seated?: TrafficCar;
+  private byCollider = new Map<number, TrafficCar>();
   private fleeing: Driver[] = [];
   exitRequested = false;
   exitBlocked = false;
@@ -69,6 +71,7 @@ export class VehicleSystem {
         .setTranslation(x, 0, z).setRotation(rotation(yaw)));
       const collider = world.createCollider(RAPIER.ColliderDesc.cuboid(width / 2, height / 2, length / 2)
         .setTranslation(0, height / 2, 0), body);
+      this.byCollider.set(collider.handle, car);
       // Keep the sweep clear of low curbs so the arcade car can mount a sidewalk.
       this.bodies.set(car, { body, collider, sweep: new RAPIER.Cuboid(width / 2, (height - .22) / 2, length / 2),
         center: (height + .22) / 2 });
@@ -84,7 +87,7 @@ export class VehicleSystem {
     if (player.y > .75) return null;
     const eye = { ...player, y: player.y + 1 };
     for (const car of this.traffic.cars) {
-      if (Math.abs(car.speed) > ENTRY_SPEED) continue;
+      if (car.explosionAge !== undefined || Math.abs(car.speed) > ENTRY_SPEED) continue;
       const { x, z, yaw } = this.traffic.pose(car, 1);
       const dx = player.x - x, dz = player.z - z;
       const { width, length, height } = car.spawn.model;
@@ -100,7 +103,7 @@ export class VehicleSystem {
   }
 
   enter(car: TrafficCar, player: Point, driverId?: string): void {
-    if (this.seated) return;
+    if (this.seated || car.explosionAge !== undefined) return;
     if (!car.offRoute) {
       const { x, z, yaw } = this.traffic.pose(car, 1);
       const cos = Math.cos(yaw), sin = Math.sin(yaw);
@@ -136,7 +139,7 @@ export class VehicleSystem {
       Math.hypot(officer.x - door.x, officer.z - door.z) < .9;
   }
 
-  exit(officer?: Point): VehicleExit | null {
+  exit(officer?: Point, emergencyFallback?: Point): VehicleExit | null {
     const car = this.seated;
     if (!car || (officer ? !this.canPullOut(officer) : Math.abs(car.speed) > EXIT_SPEED)) return null;
     const { x, z, yaw } = this.traffic.pose(car, 1);
@@ -149,6 +152,11 @@ export class VehicleSystem {
     const exits = lateral && longitudinal
       ? [[lateral, longitudinal * .98], [lateral, -longitudinal * 1.16], [lateral * 1.22, longitudinal * 1.35]]
       : [[-side, 0], [side, 0], [0, length / 2 + .64]];
+    if (emergencyFallback) {
+      for (const radius of [2.6, 3.6, 5, 7]) {
+        for (let i = 0; i < 8; i++) exits.push([Math.cos(i * Math.PI / 4) * radius, Math.sin(i * Math.PI / 4) * radius]);
+      }
+    }
     for (const [localX, localZ] of exits) {
       const px = x + localX * Math.cos(yaw) + localZ * Math.sin(yaw);
       const pz = z - localX * Math.sin(yaw) + localZ * Math.cos(yaw);
@@ -158,13 +166,9 @@ export class VehicleSystem {
       const point = { x: px, y: .65 - ground.timeOfImpact, z: pz };
       const center = { ...point, y: point.y + .82 };
       if (this.world.intersectionWithShape(center, IDENTITY, capsule, QUERY)) continue;
-      this.seated = undefined;
-      this.exitRequested = this.exitBlocked = false;
-      car.speed = 0;
-      car.braking = false;
-      car.offRoute!.previous = car.offRoute!.pose;
-      return { car, point, yaw };
+      return this.unseat(car, point, yaw);
     }
+    if (emergencyFallback) return this.unseat(car, { ...emergencyFallback }, yaw);
     if (!officer) {
       this.exitRequested = false;
       this.exitBlocked = true;
@@ -172,8 +176,37 @@ export class VehicleSystem {
     return null;
   }
 
+  private unseat(car: TrafficCar, point: Point, yaw: number): VehicleExit {
+    this.seated = undefined;
+    this.exitRequested = this.exitBlocked = false;
+    car.speed = 0;
+    car.braking = false;
+    car.offRoute!.previous = car.offRoute!.pose;
+    return { car, point, yaw };
+  }
+
+  damageFromPedestrian(speed: number): void {
+    if (this.seated) this.applyDamage(this.seated, collisionDamage(speed, true));
+  }
+
+  private applyDamage(car: TrafficCar, amount: number): void {
+    if (amount <= 0 || car.explosionAge !== undefined) return;
+    car.damage = Math.min(MAX_VEHICLE_DAMAGE, car.damage + amount);
+    if (car.damage < MAX_VEHICLE_DAMAGE) return;
+    this.traffic.detach(car);
+    car.explosionAge = 0;
+    car.speed = 0;
+    car.braking = false;
+    const { collider } = this.bodies.get(car)!;
+    const { width, length } = car.spawn.model;
+    collider.setShape(new RAPIER.Cuboid(width * .47, .22, length * .44));
+    collider.setTranslationWrtParent({ x: 0, y: .22, z: 0 });
+  }
+
   step(dt: number, input: DriveInput, pedestrian?: Point, crosswalks?: readonly Crosswalk[]): void {
-    if (this.seated) this.drive(this.seated, dt, this.exitRequested ? { throttle: 0, steer: 0, brake: true } : input);
+    for (const car of this.traffic.cars) if (car.explosionAge !== undefined) car.explosionAge = Math.min(60, car.explosionAge + dt);
+    if (this.seated && this.seated.explosionAge === undefined) this.drive(this.seated, dt,
+      this.exitRequested ? { throttle: 0, steer: 0, brake: true } : input);
     this.traffic.step(dt, pedestrian, crosswalks);
     for (const [car, { body }] of this.bodies) {
       const { x, z, yaw } = this.traffic.pose(car, 1);
@@ -206,7 +239,7 @@ export class VehicleSystem {
   /** Predict contact along actual player-car motion, never through a wall or another car. */
   npcContacts(npcs: readonly Entity[], dt: number): NpcVehicleContact[] {
     const car = this.seated;
-    if (!car) return [];
+    if (!car || car.explosionAge !== undefined) return [];
     const { body, collider } = this.bodies.get(car)!;
     const origin = body.translation();
     const to = this.traffic.pose(car, 1);
@@ -235,6 +268,7 @@ export class VehicleSystem {
   dispose(): void {
     for (const { body } of this.bodies.values()) this.world.removeRigidBody(body);
     this.bodies.clear();
+    this.byCollider.clear();
   }
 
   private drive(car: TrafficCar, dt: number, input: DriveInput): void {
@@ -251,17 +285,22 @@ export class VehicleSystem {
     const hit = Math.abs(motion.speed) > .001 ? this.world.castShape(origin, rotation(safeYaw), delta, sweep, .025, 1,
       false, QUERY, WITHOUT_NPC_BODIES, undefined, body) : null;
     const fraction = hit?.time_of_impact ?? 1;
-    if (hit) {
-      const normal = hit.normal1;
-      const closingSpeed = -(delta.x * normal.x + delta.z * normal.z) / dt;
-      // A held accelerator against a wall only adds a fraction of a meter per second per tick.
-      if (closingSpeed >= 1.8) this.events?.emit("vehicle:crashed", { vehicleId: car.spawn.id, speed: closingSpeed });
-    }
     state.previous = pose;
     state.pose = { x: pose.x + delta.x * fraction, z: pose.z + delta.z * fraction, yaw: safeYaw, turning: safeYaw !== pose.yaw };
     car.speed = hit ? 0 : motion.speed;
     car.travelled += motion.speed * dt * fraction;
     car.braking = motion.braking || !!hit;
+    if (hit) {
+      const normal = hit.normal1;
+      const closingSpeed = -(delta.x * normal.x + delta.z * normal.z) / dt;
+      // A held accelerator against a wall only adds a fraction of a meter per second per tick.
+      if (closingSpeed >= 1.8) {
+        this.events?.emit("vehicle:crashed", { vehicleId: car.spawn.id, speed: closingSpeed });
+        const other = this.byCollider.get(hit.collider.handle);
+        this.applyDamage(car, collisionDamage(closingSpeed));
+        if (other) this.applyDamage(other, collisionDamage(closingSpeed * .82));
+      }
+    }
     if (Math.abs(car.speed) > .1) this.exitBlocked = false;
   }
 

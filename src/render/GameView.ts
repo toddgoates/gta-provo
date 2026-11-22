@@ -116,7 +116,7 @@ export class GameView {
 
   updateTraffic(traffic: TrafficSystem, alpha: number): void {
     traffic.cars.forEach((car, index) => {
-      this.trafficViews[index].update(traffic.pose(car, alpha), car.travelled, car.braking);
+      this.trafficViews[index].update(traffic.pose(car, alpha), car.travelled, car.braking, car.damage, car.explosionAge, this.time);
     });
   }
 
@@ -150,7 +150,7 @@ export class GameView {
   }
 
   updatePedestrians(walkers: readonly Pedestrian[], alpha: number, melee: MeleeSystem,
-    pull?: { officerId: string; progress: number; origin: Point }): void {
+    pull?: { officerId?: string; progress: number; origin: Point }): void {
     for (const { entity, previous, phase, speed: walkSpeed } of walkers) {
       const speed = melee.hasReactor(entity.id) ? melee.reactionSpeed(entity.id) : walkSpeed;
       const view = this.actors.get(entity.id)!.view;

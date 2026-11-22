@@ -62,7 +62,9 @@ To take a car, approach it while it's stopped or crawling and press **E** when p
 - Pedestrians try to dodge a player-driven car. On impact, they tumble away from the bumper and bounce before settling. A slower hit knocks them down briefly before they flee; fast impacts are fatal. Police respond to witnessed hits and treat fatal hits more seriously.
 - Knocked-out NPCs drop glowing cash bundles worth $1–$300. Nine out of ten drops are under $100. Walk over a bundle to add it to the HUD balance.
 
-No vehicle damage, GLB assets, saves, or backend are shipped. Rapier’s compatibility package embeds WASM, so Vite can warn about the initial bundle size even when the build succeeds. See [Architecture](ARCHITECTURE.md) and [Game Design](GAME_DESIGN.md).
+Crashes into people, cars, and objects damage the car. Damaged cars smoke, then catch fire, and eventually explode into an undrivable wreck. If you're inside when it explodes, you're ejected and lose 35 HP.
+
+No GLB assets, saves, or backend are shipped. Rapier’s compatibility package embeds WASM, so Vite can warn about the initial bundle size even when the build succeeds. See [Architecture](ARCHITECTURE.md) and [Game Design](GAME_DESIGN.md).
 
 ## Audio assets
 
@@ -74,7 +76,7 @@ Copy `punch-1.mp3` and `swish-1.mp3` to `public/audio/sfx/`. The player’s mele
 
 `public/audio/sfx/crash-1.mp3` plays when the car you're driving hits another vehicle or a solid object hard enough. NPCs still use the punch clip.
 
-Copy `male-scream-1.mp3` to `public/audio/sfx/male-scream-1.mp3`. It plays once per fall as soon as the player drops at least twice his standing height (about 3.7 meters).
+Copy `male-scream-1.mp3` to `public/audio/sfx/male-scream-1.mp3`. It plays when the player drops at least twice his standing height (about 3.7 meters) or is ejected from a car.
 
 Copy `female-scream-1.mp3` and `male-scream-2.mp3` to `public/audio/sfx/`. NPCs play the matching clip when pulled from an occupied car, not when you get back into an empty car.
 

@@ -30,6 +30,7 @@ import { TrafficSystem } from "../systems/TrafficSystem";
 import { PedestrianSystem } from "../systems/PedestrianSystem";
 import type { TrafficCar } from "../systems/TrafficSystem";
 import { VehicleSystem } from "../systems/VehicleSystem";
+import { EJECTION_DAMAGE } from "../systems/VehicleDamage";
 import type { VehicleExit } from "../systems/VehicleSystem";
 import { equipGarment } from "../systems/WardrobeSystem";
 import type { HudSnapshot } from "../ui/hudStore";
@@ -76,7 +77,7 @@ export class Game {
   private candidate: Entity | null = null;
   private carCandidate: TrafficCar | null = null;
   private pullAttempt?: { id: string; elapsed: number };
-  private pulledOut?: { officerId: string; origin: Point; remaining: number };
+  private pulledOut?: { officerId?: string; origin: Point; remaining: number };
   private screamedThisFall = false;
   private cash = new CashSystem(this.events, this.player.id);
   private missionReward = 0;
@@ -284,7 +285,10 @@ export class Game {
     }, policy.walk ? this.player.position : undefined, crossings);
     if (policy.drive) {
       const targets = this.pedestrians.walkers.map(({ entity }) => entity).filter(({ id }) => !this.melee.isDown(id));
-      for (const contact of this.vehicles.npcContacts(targets, dt)) this.melee.reactToVehicle(contact, dt);
+      for (const contact of this.vehicles.npcContacts(targets, dt)) {
+        this.melee.reactToVehicle(contact, dt);
+        if (contact.eta <= dt) this.vehicles.damageFromPedestrian(contact.speed);
+      }
     }
     const impact = walkDelta && this.health.canTakeDamage
       ? this.vehicles.pedestrianImpact(this.movement.collider, walkDelta, dt) : 0;
@@ -296,6 +300,18 @@ export class Game {
       const { x, z, yaw } = this.traffic.pose(occupied, 1);
       this.player.position = { x, y: 0, z };
       this.player.yaw = yaw;
+      if (occupied.explosionAge !== undefined) {
+        const exit = this.vehicles.exit(undefined, downtown.spawns.player);
+        if (exit) {
+          this.pulledOut = { origin: this.player.position, remaining: PULL_RECOVERY };
+          this.health.applyVehicleExplosion(EJECTION_DAMAGE);
+          this.finishVehicleExit(exit);
+          if (this.health.depleted) this.handleDeath();
+          this.playFallScream();
+          this.publishHud();
+        }
+        return;
+      }
       const orders = this.police.step(dt, this.player.position, (officer) => this.vehicles.pursuitDoor(officer));
       this.melee.step(dt, false, false, undefined, orders);
       const officer = [...orders].flatMap(([id, order]) => {
@@ -313,6 +329,7 @@ export class Game {
           if (exit) {
             this.pulledOut = { officerId: officer.id, origin: this.player.position, remaining: PULL_RECOVERY };
             this.finishVehicleExit(exit);
+            this.playFallScream();
             return;
           }
           this.pullAttempt.elapsed = 0;
@@ -328,7 +345,7 @@ export class Game {
     const landed = this.movement.commit(dt);
     const fallDistance = this.movement.currentFallDistance;
     if (!this.screamedThisFall && Math.max(landed, fallDistance) >= 2 * PLAYER_HEIGHT) {
-      this.audio.play({ url: localAudioUrl(fallScreamPath), channel: "sfx" });
+      this.playFallScream();
       this.screamedThisFall = true;
     }
     if (fallDistance === 0) this.screamedThisFall = false;
@@ -339,13 +356,7 @@ export class Game {
     const trafficHit = this.health.applyTrafficImpact(impact);
     const fallHit = this.health.applyFall(landed);
     if (trafficHit || counterHit || fallHit) {
-      if (this.health.depleted) {
-        this.director.die();
-        this.audio.stopAll();
-        this.police.reset();
-        this.input.clear();
-        this.input.unlock();
-      }
+      if (this.health.depleted) this.handleDeath();
       if (trafficHit) this.playPunchSound();
       this.publishHud();
       if (this.health.depleted) return;
@@ -374,6 +385,18 @@ export class Game {
       this.publishHud();
     }
   };
+
+  private handleDeath(): void {
+    this.director.die();
+    this.audio.stopAll();
+    this.police.reset();
+    this.input.clear();
+    this.input.unlock();
+  }
+
+  private playFallScream(): void {
+    this.audio.play({ url: localAudioUrl(fallScreamPath), channel: "sfx" });
+  }
 
   private finishVehicleExit(exit: VehicleExit): void {
     this.pullAttempt = undefined;
@@ -468,10 +491,11 @@ export class Game {
       mission: current && { title: current.mission.title, objective: current.objective.text },
       dialogue: this.dialogue.view,
       pulledOut: !!this.pulledOut,
+      blastEjected: !!this.pulledOut && !this.pulledOut.officerId,
       prompt: this.director.policy.interact && !this.pulledOut ? this.candidate?.definition.interaction?.prompt ??
         (this.carCandidate ? this.carCandidate.offRoute ? "Get in car" : "Take car" : null) : null,
       driving: this.vehicles.occupied ? { speed: Math.round(Math.abs(this.vehicles.occupied.speed) * 2.237),
-        exiting: this.vehicles.exitRequested, blocked: this.vehicles.exitBlocked } : null,
+        damage: this.vehicles.occupied.damage, exiting: this.vehicles.exitRequested, blocked: this.vehicles.exitBlocked } : null,
       goal: this.goal ?? null,
       player: this.player.position,
       yaw: this.player.yaw,

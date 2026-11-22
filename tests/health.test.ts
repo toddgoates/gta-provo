@@ -47,6 +47,13 @@ it("scales fall damage by vertical drop, ignores normal jumps, and can be lethal
   expect(health.depleted).toBe(true);
 });
 
+it("takes explosion damage even during the melee cooldown", () => {
+  const health = new HealthSystem();
+  health.applyMeleeHit(10);
+  expect(health.applyVehicleExplosion(35)).toBe(true);
+  expect(health.value).toBe(55);
+});
+
 it("only collects rooftop medicine when nearby and injured, then removes it", () => {
   const medicine = new MedicinePickup(sodaRoofMedicine);
   const health = new HealthSystem();

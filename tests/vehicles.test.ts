@@ -10,9 +10,16 @@ import { MovementSystem } from "../src/systems/MovementSystem";
 import { TrafficSystem } from "../src/systems/TrafficSystem";
 import { driveMotion, VehicleSystem } from "../src/systems/VehicleSystem";
 import { NpcColliders } from "../src/systems/NpcColliders";
+import { collisionDamage, MAX_VEHICLE_DAMAGE, SMOKE_DAMAGE } from "../src/systems/VehicleDamage";
 
 const neutral = { throttle: 0, steer: 0, brake: false };
 beforeAll(async () => { await RAPIER.init(); });
+
+it("keeps light bumps free and makes typical hits survivable", () => {
+  expect(collisionDamage(1)).toBe(0);
+  expect(collisionDamage(10)).toBe(18);
+  expect(collisionDamage(9, true)).toBe(6);
+});
 
 it("assigns distinct, valid outfits and appearances across the downtown drivers", () => {
   const profiles = downtownTraffic.map(({ driver }) => driver);
@@ -119,6 +126,43 @@ it("stops the car at a wall and reports one crash even if the accelerator stays 
     expect(car.speed).toBe(0);
     expect(speeds).toHaveLength(1);
     expect(speeds[0]).toBeGreaterThan(1.8);
+    expect(car.damage).toBeGreaterThan(0);
+  } finally {
+    vehicles.dispose();
+    world.free();
+  }
+});
+
+it("damages both cars in a collision and leaves a destroyed car immobile and unboardable", () => {
+  const world = new RAPIER.World({ x: 0, y: 0, z: 0 });
+  world.timestep = FIXED_DT;
+  world.createCollider(RAPIER.ColliderDesc.cuboid(60, .5, 30).setTranslation(0, -.5, 0));
+  const second = { ...downtownTraffic[0], id: "other", distance: downtownTraffic[0].distance + 9 };
+  const traffic = new TrafficSystem([downtownTraffic[0], second]);
+  const vehicles = new VehicleSystem(world, traffic);
+  const [car, other] = traffic.cars;
+  try {
+    traffic.detach(other);
+    world.step();
+    const { x, z } = traffic.pose(car, 1);
+    vehicles.enter(car, { x, y: 0, z: z + 2 });
+    for (let i = 0; i < 120; i++) { vehicles.step(FIXED_DT, { ...neutral, throttle: 1 }); world.step(); }
+    expect(car.damage).toBeGreaterThan(0);
+    expect(car.damage).toBeLessThan(SMOKE_DAMAGE);
+    expect(other.damage).toBeGreaterThan(0);
+    const prior = car.damage;
+    vehicles.damageFromPedestrian(7);
+    expect(car.damage).toBeGreaterThan(prior);
+    for (let i = 0; i < 20; i++) vehicles.damageFromPedestrian(9);
+    expect(car.damage).toBe(MAX_VEHICLE_DAMAGE);
+    expect(car.explosionAge).toBe(0);
+    expect(vehicles.exit(undefined, { x, y: .05, z: z + 2 })?.car).toBe(car);
+    const wreck = traffic.pose(car, 1);
+    vehicles.enter(car, { x, y: 0, z: z + 2 });
+    expect(vehicles.occupied).toBeUndefined();
+    for (let i = 0; i < 90; i++) { vehicles.step(FIXED_DT, { ...neutral, throttle: 1 }); world.step(); }
+    expect(traffic.pose(car, 1)).toEqual(wreck);
+    expect(car.explosionAge).toBeGreaterThan(1);
   } finally {
     vehicles.dispose();
     world.free();

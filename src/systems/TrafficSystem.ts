@@ -32,6 +32,8 @@ export interface TrafficCar {
   braking: boolean;
   waiting: number;
   arrived: number;
+  damage: number;
+  explosionAge?: number;
   offRoute?: { pose: RoadPose; previous: RoadPose };
 }
 
@@ -50,7 +52,7 @@ export class TrafficSystem {
   constructor(spawns: readonly TrafficSpawn[]) {
     this.cars = spawns.map((spawn) => ({
       spawn, distance: spawn.distance, previous: spawn.distance, speed: 0,
-      travelled: 0, braking: false, waiting: 0, arrived: Infinity,
+      travelled: 0, braking: false, waiting: 0, arrived: Infinity, damage: 0,
     }));
   }
 

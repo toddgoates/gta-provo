@@ -39,6 +39,12 @@ export class HealthSystem {
     return true;
   }
 
+  applyVehicleExplosion(damage: number): boolean {
+    if (this.depleted || !(damage > 0)) return false;
+    this.remaining = Math.max(0, this.remaining - damage);
+    return true;
+  }
+
   private applyDamage(damage: number, cooldown: number): boolean {
     if (!this.canTakeDamage || !(damage > 0)) return false;
     this.remaining = Math.max(0, this.remaining - damage);
