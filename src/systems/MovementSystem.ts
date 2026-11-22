@@ -4,6 +4,7 @@ import type { Entity, Point } from "../entities/EntityManager";
 const HALF_SEGMENT = .48;
 const RADIUS = .32;
 const CENTER = HALF_SEGMENT + RADIUS;
+export const PLAYER_HEIGHT = 1.86; // Standing height of the visual rig, not the shorter capsule.
 export interface WalkInput { forward: number; strafe: number; sprint: boolean; jump: boolean; heading: number }
 
 export class MovementSystem {
@@ -15,6 +16,10 @@ export class MovementSystem {
   private airPeak: number | null = null;
   previous: Point;
   speed = 0;
+
+  get currentFallDistance(): number {
+    return this.airPeak === null ? 0 : Math.max(0, this.airPeak - this.player.position.y);
+  }
 
   constructor(private readonly world: RAPIER.World, readonly player: Entity) {
     const { x, y, z } = player.position;
@@ -56,7 +61,7 @@ export class MovementSystem {
       this.airPeak = Math.max(this.airPeak ?? this.previous.y, feet);
       return 0;
     }
-    const drop = this.airPeak === null ? 0 : Math.max(0, this.airPeak - feet);
+    const drop = this.currentFallDistance;
     this.airPeak = null;
     return drop;
   }

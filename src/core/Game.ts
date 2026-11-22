@@ -1,6 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { downtown } from "../content/downtown";
-import { cashPickupPath, cityAmbiencePath, localAudioUrl, meleeHitPath, meleeMissPath, vehicleCrashPath } from "../content/audio";
+import { cashPickupPath, cityAmbiencePath, fallScreamPath, localAudioUrl, meleeHitPath, meleeMissPath, vehicleCrashPath } from "../content/audio";
 import { downtownPedestrians } from "../content/pedestrians";
 import { policeConfig, reinforcementLooks, reinforcementPoints } from "../content/police";
 import { createPedestrianLook } from "../content/characters/pedestrianLooks";
@@ -21,7 +21,7 @@ import { WantedLevelSystem } from "../systems/WantedLevelSystem";
 import type { WantedLevel } from "../systems/WantedLevelSystem";
 import { PoliceResponseSystem } from "../systems/PoliceResponseSystem";
 import { MissionSystem } from "../systems/MissionSystem";
-import { MovementSystem } from "../systems/MovementSystem";
+import { MovementSystem, PLAYER_HEIGHT } from "../systems/MovementSystem";
 import { NpcColliders, WITHOUT_NPC_BODIES } from "../systems/NpcColliders";
 import { SequenceDirector } from "../systems/SequenceDirector";
 import { TriggerSystem } from "../systems/TriggerSystem";
@@ -75,6 +75,7 @@ export class Game {
   private carCandidate: TrafficCar | null = null;
   private pullAttempt?: { id: string; elapsed: number };
   private pulledOut?: { officerId: string; origin: Point; remaining: number };
+  private screamedThisFall = false;
   private cash = new CashSystem(this.events, this.player.id);
   private missionReward = 0;
   private complete = false;
@@ -320,6 +321,12 @@ export class Game {
     }
     if (!policy.walk) return;
     const landed = this.movement.commit(dt);
+    const fallDistance = this.movement.currentFallDistance;
+    if (!this.screamedThisFall && Math.max(landed, fallDistance) >= 2 * PLAYER_HEIGHT) {
+      this.audio.play({ url: localAudioUrl(fallScreamPath), channel: "sfx" });
+      this.screamedThisFall = true;
+    }
+    if (fallDistance === 0) this.screamedThisFall = false;
     const counterDamage = this.melee.step(dt, strike, true, (id) => !this.pedestrians.isCrossing(id),
       this.police.step(dt, this.player.position));
     const counterHit = this.health.applyMeleeHit(counterDamage);
@@ -350,6 +357,7 @@ export class Game {
     else if (this.carCandidate && this.director.setFreeMode("driving")) {
       this.vehicles.enter(this.carCandidate, this.player.position, this.player.id);
       this.movement.board();
+      this.screamedThisFall = false;
       this.carCandidate = null;
       this.input.clear();
       this.events.emit("vehicle:entered", { vehicleId: this.vehicles.occupied!.spawn.id });
