@@ -75,4 +75,6 @@ Copy `punch-1.mp3` and `swish-1.mp3` to `public/audio/sfx/`. The player’s mele
 
 Copy `male-scream-1.mp3` to `public/audio/sfx/male-scream-1.mp3`. It plays once per fall as soon as the player drops at least twice his standing height (about 3.7 meters).
 
+Copy `female-scream-1.mp3` and `male-scream-2.mp3` to `public/audio/sfx/`. NPCs play the matching clip when pulled from an occupied car, not when you get back into an empty car.
+
 For future voice lines, put files in `public/audio/dialogue/` and set the dialogue node's `audio` field to a path relative to `public/`, for example `audio/dialogue/marla-hello.mp3`. Conversations lower ambience and music, even when a line is text-only. Music and sound effects can play alongside ambience. Pausing the game pauses all channels; resuming continues playback.

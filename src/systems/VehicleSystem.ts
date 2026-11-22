@@ -111,6 +111,7 @@ export class VehicleSystem {
         position: { x: x + dx * offset, y: .55, z: z + dz * offset },
         yaw: Math.atan2(-dx, -dz), tumble: .35, running: false, age: 0, dx, dz });
       this.traffic.detach(car);
+      this.events?.emit("vehicle:driver_ejected", { vehicleId: car.spawn.id, gender: car.spawn.driver.gender });
       if (driverId) this.events?.emit("vehicle:stolen", {
         id: `theft-${car.spawn.id}`, offenderId: driverId, victimId: car.spawn.id, position: { ...player },
       });

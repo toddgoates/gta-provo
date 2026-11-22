@@ -5,5 +5,9 @@ export const meleeHitPath = "audio/sfx/punch-1.mp3";
 export const meleeMissPath = "audio/sfx/swish-1.mp3";
 export const vehicleCrashPath = "audio/sfx/crash-1.mp3";
 export const fallScreamPath = "audio/sfx/male-scream-1.mp3";
+export const driverScreamPaths = {
+  female: "audio/sfx/female-scream-1.mp3",
+  male: "audio/sfx/male-scream-2.mp3",
+} as const;
 
 export const localAudioUrl = (path: string): string => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, "")}`;

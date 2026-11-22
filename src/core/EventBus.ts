@@ -1,4 +1,5 @@
 import type { Point } from "../entities/EntityManager";
+import type { DriverProfile } from "../entities/Appearance";
 
 export interface CrimeIncident {
   id: string;
@@ -24,6 +25,7 @@ export interface GameEvents {
   "location:entered": { locationId: string };
   "vehicle:entered": { vehicleId: string };
   "vehicle:exited": { vehicleId: string };
+  "vehicle:driver_ejected": { vehicleId: string; gender: DriverProfile["gender"] };
   "vehicle:crashed": { vehicleId: string; speed: number };
   "item:collected": { itemId: string };
   "item:delivered": { itemId: string; locationId: string };

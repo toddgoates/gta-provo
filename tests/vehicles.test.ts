@@ -43,6 +43,8 @@ it("boards only a nearby slow car, ejects its driver once, and parks beside a cl
   const events = new EventBus();
   const thefts: string[] = [];
   events.on("vehicle:stolen", ({ offenderId }) => thefts.push(offenderId));
+  const ejections: string[] = [];
+  events.on("vehicle:driver_ejected", ({ gender }) => ejections.push(gender));
   const vehicles = new VehicleSystem(world, traffic, events);
   const [car] = traffic.cars;
   const start = traffic.pose(car, 1);
@@ -84,6 +86,7 @@ it("boards only a nearby slow car, ejects its driver once, and parks beside a cl
     vehicles.enter(car, exit.point, player.id);
     expect(vehicles.drivers).toHaveLength(0);
     expect(thefts).toEqual([player.id]);
+    expect(ejections).toEqual([car.spawn.driver.gender]);
   } finally {
     movement.dispose();
     vehicles.dispose();
