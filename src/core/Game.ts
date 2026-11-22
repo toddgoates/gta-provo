@@ -1,5 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { downtown, sodaRoofMedicine } from "../content/downtown";
+import { hasRoofRouteSupport, isOnRoofStairs, roofSearchTarget, roofStepHeight, roofWaypoints } from "../content/roofAccess";
 import { cashPickupPath, cityAmbiencePath, driverScreamPaths, fallScreamPath, healPath, localAudioUrl, meleeHitPath, meleeMissPath, vehicleCrashPath } from "../content/audio";
 import { downtownPedestrians } from "../content/pedestrians";
 import { policeConfig, reinforcementLooks, reinforcementPoints } from "../content/police";
@@ -114,7 +115,7 @@ export class Game {
       }, (landed) => {
         if (landed) this.playPunchSound();
         else this.audio.play({ url: localAudioUrl(meleeMissPath), channel: "sfx" });
-      });
+      }, roofStepHeight);
     this.view.addActor(this.player);
     this.view.addActor(this.npc);
     for (const { entity } of this.pedestrians.walkers) this.view.addActor(entity);
@@ -125,7 +126,8 @@ export class Game {
     this.police = new PoliceResponseSystem(this.wanted, {
       officers, active: conscious,
       clearSight: (a, b) => this.clearSight(a, b, 1.25),
-      clearRoute: (a, b) => this.clearSight(a, b, .85, true),
+      clearRoute: (a, b) => hasRoofRouteSupport(a, b) && this.clearSight(a, b, .85, true),
+      searchHint: roofSearchTarget,
       isOnScreen: (point) => this.view.isOnScreen(point),
       canSpawnAt: (point) => !this.physics.intersectionWithShape({ ...point, y: point.y + .83 },
         { x: 0, y: 0, z: 0, w: 1 }, new RAPIER.Capsule(.44, .29)),
@@ -145,7 +147,7 @@ export class Game {
         this.view.removeActor(id);
         this.entities.remove(id);
       },
-    }, reinforcementPoints);
+    }, reinforcementPoints, [...reinforcementPoints, ...roofWaypoints]);
     this.crime = new CrimeSystem(this.events, this.player.id, {
       findEntity: (id) => this.entities.get(id), officers, conscious,
       clearSight: (a, b) => this.clearSight(a, b, 1.25), radius: policeConfig.witnessRadius,
@@ -362,6 +364,7 @@ export class Game {
       if (this.health.depleted) return;
     }
     if (this.cash.step(dt, this.player.position)) {
+      this.view.flashCash();
       this.audio.play({ url: localAudioUrl(cashPickupPath), channel: "sfx" });
       this.publishHud();
     }
@@ -455,7 +458,8 @@ export class Game {
     this.view.updateCash(this.cash.pickups);
     this.view.updateMedicine(this.medicine.position);
     this.view.render(this.player, interpolated, walk ? this.movement.speed : 0, this.goal,
-      camera === "hold" ? 0 : dt, !!occupied, this.melee.getPose(this.player.id), pull);
+      camera === "hold" ? 0 : dt, !!occupied, this.melee.getPose(this.player.id), pull,
+      walk && isOnRoofStairs(interpolated));
     if (import.meta.env.DEV && dt > 0) this.fps += (1 / dt - this.fps) * .09;
     this.hudElapsed += dt;
     if (this.hudElapsed >= .1) this.publishHud();

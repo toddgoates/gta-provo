@@ -57,6 +57,7 @@ export class MeleeSystem {
     private readonly reportHit: (hit: CrimeIncident & { knockedOut: boolean; source?: "vehicle" }) => void = () => {},
     private readonly floorAt: (point: Point) => number = (point) => onSidewalk(point) ? .15 : -.01,
     private readonly reportPlayerStrike: (landed: boolean) => void = () => {},
+    private readonly walkHeight?: (from: Point, to: Point) => number | undefined,
   ) {}
 
   get attacking(): boolean { return !!this.swing; }
@@ -211,9 +212,10 @@ export class MeleeSystem {
         fighter.swing = undefined;
         continue;
       }
-      if (order && (!order.attack || !canFight || (!fighter.swing && distance(npc.position, this.player.position) > 1.35))) {
+      if (order && (!order.attack || !canFight || (!fighter.swing &&
+          (distance(npc.position, this.player.position) > 1.35 || Math.abs(npc.position.y - this.player.position.y) > .65)))) {
         fighter.swing = undefined;
-        if (distance(npc.position, order.destination) > .55) {
+        if (distance(npc.position, order.destination) > .16) {
           fighter.speed = this.move(npc, direction(npc.position, order.destination), order.attack ? 4.9 : 3.5, dt, true);
         }
         continue;
@@ -316,8 +318,13 @@ export class MeleeSystem {
     const from = entity.position;
     const ahead = (step: number): Point => ({ x: from.x - Math.sin(yaw) * step, y: from.y, z: from.z - Math.cos(yaw) * step });
     const to = ahead(speed * dt);
-    if ((onSidewalk(from) && !onSidewalk(to) && !crossRoad) || !this.clearPath(from, ahead(Math.max(.45, speed * dt)))) return 0;
-    to.y = onSidewalk(to) ? .15 : -.01;
+    if (onSidewalk(from) && !onSidewalk(to) && !crossRoad) return 0;
+    const height = this.walkHeight ? this.walkHeight(from, to) : onSidewalk(to) ? .15 : -.01;
+    if (height === undefined) return 0;
+    to.y = height;
+    const lookAhead = ahead(Math.max(.32, speed * dt));
+    lookAhead.y = this.walkHeight?.(from, lookAhead) ?? height;
+    if (!this.clearPath(from, lookAhead)) return 0;
     entity.position = to;
     entity.yaw = yaw;
     return speed;

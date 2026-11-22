@@ -48,7 +48,7 @@ To take a car, approach it while it's stopped or crawling and press **E** when p
 
 - Three developed blocks and a public plaza with storefronts, crosswalks, trees, and a Wasatch-inspired skyline.
 - Fixed-step Rapier capsule movement with gravity, curb stepping, jumping, and building collision; a follow camera with wall obstruction.
-- Walk up the exterior stairs on the east side of Soda Dept. to reach its roof. Normal jumps are safe; higher falls do more damage.
+- Walk up the exterior stairs on the east side of Soda Dept. to reach its roof. Pursuing officers can follow you up. Normal jumps are safe; higher falls do more damage.
 - The center of the Soda Dept. roof has a medicine pickup that restores up to 20 HP and briefly makes the player glow red. It stays available if you're at full health.
 - Six low-poly NPC cars in three body styles. They keep right, brake behind other cars, take turns at the four-way stop, and yield to the player.
 - Thirteen pedestrians in a mix of solo walkers, pairs, and small groups. Some stand and chat; walkers stay on sidewalks and use marked crosswalks when traffic clears.
@@ -60,7 +60,7 @@ To take a car, approach it while it's stopped or crawling and press **E** when p
 - Ambient pedestrians may flee or fight back after being hit. Those who fight stay committed, even after taking a full combo. Their counterattacks reduce player health. Marla remains a dialogue-only NPC.
 - Ambient pedestrians have hidden health. When it reaches zero they collapse, stop fighting, and stay down.
 - Pedestrians try to dodge a player-driven car. On impact, they tumble away from the bumper and bounce before settling. A slower hit knocks them down briefly before they flee; fast impacts are fatal. Police respond to witnessed hits and treat fatal hits more seriously.
-- Knocked-out NPCs drop glowing cash bundles worth $1–$300. Nine out of ten drops are under $100. Walk over a bundle to add it to the HUD balance.
+- Knocked-out NPCs drop glowing cash bundles worth $1–$300. Nine out of ten drops are under $100. Collecting one adds it to your balance and briefly makes the player glow green.
 
 Crashes into people, cars, and objects damage the car. Damaged cars smoke, then catch fire, and eventually explode into an undrivable wreck. If you're inside when it explodes, you're ejected and lose 35 HP.
 

@@ -156,6 +156,8 @@ export class WorldManager {
     const base = .15;
     const rise = roof - base;
     const x = wallX + width / 2;
+    const visualWidth = width - .19;
+    const visualX = wallX + .19 + visualWidth / 2;
     const endZ = baseZ + run;
     const rail = 0x414950;
     const tread = 0x687474;
@@ -165,8 +167,8 @@ export class WorldManager {
     for (let i = 0; i < steps; i++) {
       const y = base + rise * (i + 1) / steps;
       const z = baseZ + depth * (i + .5);
-      this.box(x, y - .065, z, width, .13, depth + .025, tread);
-      this.box(x, y - .015, z - depth / 2 + .026, width, .03, .06, 0xbfaa83);
+      this.box(visualX, y - .065, z, visualWidth, .13, depth - .004, tread);
+      this.box(visualX, y + .009, z - depth / 2 + .053, visualWidth - .035, .012, .055, 0xbfaa83);
     }
     const angle = Math.atan2(rise, run);
     const span = Math.hypot(rise, run);
@@ -190,7 +192,8 @@ export class WorldManager {
       const t = i / 10;
       this.box(outer, base + rise * t + .51, baseZ + run * t, .092, 1.02, .092, rail);
     }
-    this.box(x - .42, roof - .11, endZ + .98, width + .84, .22, 2.03, tread, true);
+    this.box(x - .42, roof - .11, endZ + .98, width + .84, .22, 2.03, tread, true, false);
+    this.box(visualX, roof - .113, endZ + 1, visualWidth, .22, 1.996, tread);
     this.box(outer, roof + .5, endZ + .98, .095, 1, 2.03, rail, true);
     this.box(x - .42, roof + .5, endZ + 1.98, width + .84, 1, .095, rail, true);
     this.box(x, roof / 2, endZ + 1.46, .16, roof, .16, rail);

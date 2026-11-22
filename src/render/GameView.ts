@@ -3,6 +3,7 @@ import type { Entity, Point } from "../entities/EntityManager";
 import { CameraRig } from "./CameraRig";
 import { CashView } from "./CashView";
 import { buildMedicine } from "./MedicineView";
+import { stairTreadDepth } from "../content/roofAccess";
 import type { CashDrop } from "../systems/CashSystem";
 import { TrafficView } from "./TrafficView";
 import type { TrafficSystem } from "../systems/TrafficSystem";
@@ -23,6 +24,9 @@ export class GameView {
   private cash = new CashView();
   private medicine = buildMedicine();
   private healGlow = 0;
+  private cashGlow = 0;
+  private stairPhase = 0;
+  private stairBlend = 0;
   private playerGlowMaterials = new Set<THREE.MeshLambertMaterial>();
   private marker = new THREE.Group();
   private crystal: THREE.Mesh;
@@ -83,6 +87,7 @@ export class GameView {
   }
 
   flashHealing(): void { this.healGlow = .55; }
+  flashCash(): void { this.cashGlow = .42; }
 
   removeActor(id: string): void {
     const actor = this.actors.get(id);
@@ -218,13 +223,15 @@ export class GameView {
   }
 
   render(player: Entity, position: Point, speed: number, goal: Point | undefined, dt: number, seated = false,
-    melee?: MeleePose, pull?: { progress: number; origin: Point }): void {
+    melee?: MeleePose, pull?: { progress: number; origin: Point }, onStairs = false): void {
     this.time += dt;
-    if (this.healGlow > 0) {
+    if (this.healGlow > 0 || this.cashGlow > 0) {
       this.healGlow = Math.max(0, this.healGlow - dt);
-      const intensity = Math.pow(this.healGlow / .55, 1.45) * .95;
+      this.cashGlow = Math.max(0, this.cashGlow - dt);
+      const healing = this.healGlow > 0;
+      const intensity = healing ? Math.pow(this.healGlow / .55, 1.45) * .95 : Math.pow(this.cashGlow / .42, 1.4) * .52;
       for (const material of this.playerGlowMaterials) {
-        material.emissive.setHex(0xff253a);
+        material.emissive.setHex(healing ? 0xff253a : 0x52f06c);
         material.emissiveIntensity = intensity;
       }
     }
@@ -237,6 +244,17 @@ export class GameView {
     actor.group.rotation.set(0, player.yaw, 0, "YXZ");
     const stride = Math.sin(this.time * (speed > 6 ? 14 : 10)) * Math.min(.65, speed * .085);
     poseCharacter(actor, stride, melee);
+    const stairWalk = onStairs && speed > .15 && !pull && !melee;
+    this.stairBlend += (Number(stairWalk) - this.stairBlend) * (1 - Math.exp(-dt * 18));
+    if (stairWalk) this.stairPhase += dt * Math.PI * Math.min(4.3, speed / (3.5 * stairTreadDepth));
+    if (this.stairBlend > .01) {
+      const phase = this.stairPhase;
+      actor.group.position.y += Math.abs(Math.sin(phase)) * .115 * this.stairBlend;
+      actor.limbs[0].rotation.x += .18 * Math.sin(phase) * this.stairBlend;
+      actor.limbs[2].rotation.x -= .18 * Math.sin(phase) * this.stairBlend;
+      actor.joints[0].rotation.x -= Math.max(0, Math.sin(phase)) * .52 * this.stairBlend;
+      actor.joints[2].rotation.x -= Math.max(0, -Math.sin(phase)) * .52 * this.stairBlend;
+    }
     if (pull) {
       const t = pull.progress;
       const outward = Math.min(1, .28 + 2.65 * t);

@@ -19,13 +19,14 @@ interface PoliceWorld {
   active: (id: string) => boolean;
   clearSight: (a: Point, b: Point) => boolean;
   clearRoute: (a: Point, b: Point) => boolean;
+  searchHint?: (lastSeen: Point) => Point | undefined;
   isOnScreen: (point: Point) => boolean;
   canSpawnAt: (point: Point) => boolean;
   spawn: (at: Point) => Entity;
   remove: (id: string) => void;
 }
 
-const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.z - b.z);
+const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 
 export class PoliceResponseSystem {
   private active = new Map<string, Response>();
@@ -36,7 +37,7 @@ export class PoliceResponseSystem {
   visible = false;
 
   constructor(private readonly wanted: WantedLevelSystem, private readonly world: PoliceWorld,
-    private readonly points: readonly Point[]) {}
+    private readonly spawnPoints: readonly Point[], private readonly navigationPoints: readonly Point[] = spawnPoints) {}
 
   get count(): number {
     return [...this.active.values()].filter(({ phase, officer }) => phase !== "return" && this.world.active(officer.id)).length;
@@ -101,7 +102,7 @@ export class PoliceResponseSystem {
         this.recruit(officer, player);
       }
       if (this.count < target && this.cooldown === 0 && this.reserves.size < policeConfig.maxReinforcements) {
-        const origin = this.points.filter((point) => distance(point, player) >= policeConfig.spawnMinDistance &&
+        const origin = this.spawnPoints.filter((point) => distance(point, player) >= policeConfig.spawnMinDistance &&
           distance(point, player) <= policeConfig.spawnMaxDistance && !this.world.isOnScreen(point) &&
           this.world.canSpawnAt(point) && officers.every(({ position }) => distance(position, point) > 3))
           .sort((a, b) => distance(a, this.incident?.position ?? player) - distance(b, this.incident?.position ?? player))[0];
@@ -123,7 +124,15 @@ export class PoliceResponseSystem {
           response.phase = "pursue";
           response.lastKnown = { ...player };
           response.remaining = policeConfig.searchSeconds;
-        } else if (before === "pursue") response.phase = "search";
+        } else if (before === "pursue" || before === "investigate" && distance(officer.position, response.lastKnown) < 1.1) {
+          const hint = this.world.searchHint?.(response.lastKnown);
+          if (hint) {
+            response.lastKnown = hint;
+            response.remaining = Math.max(response.remaining, policeConfig.searchSeconds + 4);
+            response.repath = 0;
+          }
+          response.phase = "search";
+        }
         else if (before === "search" || before === "investigate" && distance(officer.position, response.lastKnown) < 1.5) {
           response.remaining -= dt;
           if (distance(officer.position, response.lastKnown) < 1.15) officer.yaw += dt * .95;
@@ -173,7 +182,7 @@ export class PoliceResponseSystem {
   }
 
   private route(start: Point, goal: Point): Point {
-    const points = this.points;
+    const points = this.navigationPoints;
     this.graph ??= points.map((a, i) => points.flatMap((b, j) => i !== j && this.world.clearRoute(a, b) ? [j] : []));
     const cost = points.map((point) => this.world.clearRoute(start, point) ? distance(start, point) : Infinity);
     const first = points.map((_, i) => i);
