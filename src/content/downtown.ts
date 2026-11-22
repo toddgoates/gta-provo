@@ -56,3 +56,5 @@ export const downtown: DistrictDefinition = {
   locations: [{ id: "welcome-pavilion", position: { x: 28, y: 0.15, z: 19 }, radius: 2.7 }],
   spawns: { player: { x: -18, y: 0.18, z: 17 }, npc: { x: -20, y: 0.16, z: 13 } },
 };
+
+export const sodaRoofMedicine = { position: { x: -24, y: 8.30, z: 34 }, hp: 20 } as const;

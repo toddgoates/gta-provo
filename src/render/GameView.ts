@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { Entity, Point } from "../entities/EntityManager";
 import { CameraRig } from "./CameraRig";
 import { CashView } from "./CashView";
+import { buildMedicine } from "./MedicineView";
 import type { CashDrop } from "../systems/CashSystem";
 import { TrafficView } from "./TrafficView";
 import type { TrafficSystem } from "../systems/TrafficSystem";
@@ -20,6 +21,9 @@ export class GameView {
   private driverViews = new Map<string, ReturnType<typeof buildCharacter>>();
   private downedMarks = new Map<string, THREE.Mesh>();
   private cash = new CashView();
+  private medicine = buildMedicine();
+  private healGlow = 0;
+  private playerGlowMaterials = new Set<THREE.MeshLambertMaterial>();
   private marker = new THREE.Group();
   private crystal: THREE.Mesh;
   private shadow = new THREE.Mesh(new THREE.CircleGeometry(.49, 12),
@@ -47,7 +51,8 @@ export class GameView {
     this.marker.add(ring, this.crystal);
     this.marker.visible = false;
     this.shadow.rotation.x = -Math.PI / 2;
-    this.scene.add(this.marker, this.shadow, this.cash.root);
+    this.medicine.visible = false;
+    this.scene.add(this.marker, this.shadow, this.cash.root, this.medicine);
     mount.append(this.renderer.domElement);
     const resize = () => {
       const { clientWidth: width, clientHeight: height } = mount;
@@ -68,7 +73,16 @@ export class GameView {
     view.group.rotation.y = entity.yaw;
     this.actors.set(entity.id, { entity, view });
     this.scene.add(view.group);
+    if (entity.definition.kind === "player") {
+      view.group.traverse((part) => {
+        if (part instanceof THREE.Mesh && part.material instanceof THREE.MeshLambertMaterial) {
+          this.playerGlowMaterials.add(part.material);
+        }
+      });
+    }
   }
+
+  flashHealing(): void { this.healGlow = .55; }
 
   removeActor(id: string): void {
     const actor = this.actors.get(id);
@@ -107,6 +121,13 @@ export class GameView {
   }
 
   updateCash(drops: Iterable<CashDrop>): void { this.cash.update(drops, this.time); }
+
+  updateMedicine(position?: Point): void {
+    this.medicine.visible = !!position;
+    if (!position) return;
+    this.medicine.position.set(position.x, position.y + .62 + Math.sin(this.time * 3) * .09, position.z);
+    this.medicine.rotation.y = this.time * 1.25;
+  }
 
   updateDrivers(drivers: readonly FleeingDriver[]): void {
     for (const view of this.driverViews.values()) view.group.visible = false;
@@ -199,6 +220,14 @@ export class GameView {
   render(player: Entity, position: Point, speed: number, goal: Point | undefined, dt: number, seated = false,
     melee?: MeleePose, pull?: { progress: number; origin: Point }): void {
     this.time += dt;
+    if (this.healGlow > 0) {
+      this.healGlow = Math.max(0, this.healGlow - dt);
+      const intensity = Math.pow(this.healGlow / .55, 1.45) * .95;
+      for (const material of this.playerGlowMaterials) {
+        material.emissive.setHex(0xff253a);
+        material.emissiveIntensity = intensity;
+      }
+    }
     for (const { entity, view } of this.actors.values()) {
       if (entity.wardrobe) view.updateWardrobe(entity.wardrobe);
     }

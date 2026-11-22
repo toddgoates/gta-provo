@@ -49,6 +49,7 @@ To take a car, approach it while it's stopped or crawling and press **E** when p
 - Three developed blocks and a public plaza with storefronts, crosswalks, trees, and a Wasatch-inspired skyline.
 - Fixed-step Rapier capsule movement with gravity, curb stepping, jumping, and building collision; a follow camera with wall obstruction.
 - Walk up the exterior stairs on the east side of Soda Dept. to reach its roof. Normal jumps are safe; higher falls do more damage.
+- The center of the Soda Dept. roof has a medicine pickup that restores up to 20 HP and briefly makes the player glow red. It stays available if you're at full health.
 - Six low-poly NPC cars in three body styles. They keep right, brake behind other cars, take turns at the four-way stop, and yield to the player.
 - Thirteen pedestrians in a mix of solo walkers, pairs, and small groups. Some stand and chat; walkers stay on sidewalks and use marked crosswalks when traffic clears.
 - Take over a slow or stopped car, watch one of six distinct drivers tumble out and flee, and drive with an arcade chase camera.
@@ -76,5 +77,7 @@ Copy `punch-1.mp3` and `swish-1.mp3` to `public/audio/sfx/`. The player’s mele
 Copy `male-scream-1.mp3` to `public/audio/sfx/male-scream-1.mp3`. It plays once per fall as soon as the player drops at least twice his standing height (about 3.7 meters).
 
 Copy `female-scream-1.mp3` and `male-scream-2.mp3` to `public/audio/sfx/`. NPCs play the matching clip when pulled from an occupied car, not when you get back into an empty car.
+
+Copy `heal-1.mp3` to `public/audio/sfx/heal-1.mp3`. It plays when you collect the rooftop medicine.
 
 For future voice lines, put files in `public/audio/dialogue/` and set the dialogue node's `audio` field to a path relative to `public/`, for example `audio/dialogue/marla-hello.mp3`. Conversations lower ambience and music, even when a line is text-only. Music and sound effects can play alongside ambience. Pausing the game pauses all channels; resuming continues playback.

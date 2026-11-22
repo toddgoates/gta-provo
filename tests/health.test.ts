@@ -1,6 +1,8 @@
 import { expect, it } from "vitest";
 import { GameDirector } from "../src/core/GameDirector";
 import { HealthSystem } from "../src/systems/HealthSystem";
+import { MedicinePickup } from "../src/systems/MedicinePickup";
+import { sodaRoofMedicine } from "../src/content/downtown";
 
 it("starts at full health, ignores slow traffic, and enforces a cooldown", () => {
   const health = new HealthSystem();
@@ -43,4 +45,21 @@ it("scales fall damage by vertical drop, ignores normal jumps, and can be lethal
   expect(health.value).toBe(30);
   expect(health.applyFall(14)).toBe(true);
   expect(health.depleted).toBe(true);
+});
+
+it("only collects rooftop medicine when nearby and injured, then removes it", () => {
+  const medicine = new MedicinePickup(sodaRoofMedicine);
+  const health = new HealthSystem();
+  const restore = (amount: number) => health.restore(amount);
+  const roof = sodaRoofMedicine.position;
+  expect(medicine.collect(roof, restore)).toBe(false);
+  health.applyFall(5);
+  expect(medicine.collect({ ...roof, y: 0 }, restore)).toBe(false);
+  expect(medicine.collect({ ...roof, x: roof.x + 2 }, restore)).toBe(false);
+  expect(medicine.collect(roof, restore)).toBe(true);
+  expect(health.value).toBe(95);
+  expect(medicine.position).toBeUndefined();
+  expect(medicine.collect(roof, restore)).toBe(false);
+  expect(health.restore(20)).toBe(true);
+  expect(health.value).toBe(100);
 });

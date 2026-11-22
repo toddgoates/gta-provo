@@ -1,6 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
-import { downtown } from "../content/downtown";
-import { cashPickupPath, cityAmbiencePath, driverScreamPaths, fallScreamPath, localAudioUrl, meleeHitPath, meleeMissPath, vehicleCrashPath } from "../content/audio";
+import { downtown, sodaRoofMedicine } from "../content/downtown";
+import { cashPickupPath, cityAmbiencePath, driverScreamPaths, fallScreamPath, healPath, localAudioUrl, meleeHitPath, meleeMissPath, vehicleCrashPath } from "../content/audio";
 import { downtownPedestrians } from "../content/pedestrians";
 import { policeConfig, reinforcementLooks, reinforcementPoints } from "../content/police";
 import { createPedestrianLook } from "../content/characters/pedestrianLooks";
@@ -13,6 +13,7 @@ import { GameView } from "../render/GameView";
 import { DialogueSystem } from "../systems/DialogueSystem";
 import { InteractionSystem } from "../systems/InteractionSystem";
 import { HealthSystem } from "../systems/HealthSystem";
+import { MedicinePickup } from "../systems/MedicinePickup";
 import { AudioSystem } from "../systems/AudioSystem";
 import { CashSystem } from "../systems/CashSystem";
 import { MeleeSystem } from "../systems/MeleeSystem";
@@ -51,6 +52,7 @@ export class Game {
   private triggers = new TriggerSystem(this.events, downtown.locations);
   private interaction = new InteractionSystem(this.events);
   private health = new HealthSystem();
+  private medicine = new MedicinePickup(sodaRoofMedicine);
   private audio = new AudioSystem();
   private audioInput = new AbortController();
   private sequences = new SequenceDirector(this.director);
@@ -352,6 +354,11 @@ export class Game {
       this.audio.play({ url: localAudioUrl(cashPickupPath), channel: "sfx" });
       this.publishHud();
     }
+    if (this.medicine.collect(this.player.position, (hp) => this.health.restore(hp))) {
+      this.view.flashHealing();
+      this.audio.play({ url: localAudioUrl(healPath), channel: "sfx" });
+      this.publishHud();
+    }
     this.triggers.update(this.player.position);
     this.candidate = this.interaction.nearest(this.player.position, this.entities.all());
     this.carCandidate = this.vehicles.nearest(this.player.position, this.movement.collider)?.car ?? null;
@@ -423,6 +430,7 @@ export class Game {
     this.view.updatePedestrians(this.pedestrians.walkers, alpha, this.melee, pull);
     this.view.updateDrivers(this.vehicles.drivers);
     this.view.updateCash(this.cash.pickups);
+    this.view.updateMedicine(this.medicine.position);
     this.view.render(this.player, interpolated, walk ? this.movement.speed : 0, this.goal,
       camera === "hold" ? 0 : dt, !!occupied, this.melee.getPose(this.player.id), pull);
     if (import.meta.env.DEV && dt > 0) this.fps += (1 / dt - this.fps) * .09;

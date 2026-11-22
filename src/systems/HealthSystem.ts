@@ -25,6 +25,12 @@ export class HealthSystem {
     return this.applyDamage(damage, .46);
   }
 
+  restore(amount: number): boolean {
+    if (this.depleted || this.remaining === MAX_HEALTH || !(amount > 0)) return false;
+    this.remaining = Math.min(MAX_HEALTH, this.remaining + amount);
+    return true;
+  }
+
   applyFall(drop: number): boolean {
     const damage = Math.round((drop - SAFE_FALL) * FALL_DAMAGE_PER_METER);
     // Contact invulnerability should not let the player survive an otherwise fatal fall.
